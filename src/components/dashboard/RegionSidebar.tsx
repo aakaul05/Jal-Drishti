@@ -1,15 +1,30 @@
 import { useState, useMemo } from "react";
-import { Search, MapPin, History, Droplets, ChevronDown, ChevronRight } from "lucide-react";
+import { Search, MapPin, History, Droplets, ChevronDown, ChevronRight, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { useDashboard } from "@/context/DashboardContext";
 import { maharashtraDistricts, searchRegions, regions, type Region } from "@/data/mockData";
 
 export function RegionSidebar() {
-  const { selectedRegion, setSelectedRegion, sessionHistory } = useDashboard();
+  const { 
+    selectedRegion, 
+    setSelectedRegion, 
+    sessionHistory,
+    selectedMonth,
+    setSelectedMonth,
+    selectedYear,
+    setSelectedYear
+  } = useDashboard();
   const [query, setQuery] = useState("");
   const [expandedDistrict, setExpandedDistrict] = useState<string | null>(null);
   const [expandedSubDistrict, setExpandedSubDistrict] = useState<string | null>(null);
+  
+  // State for dropdown selections
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
+  const [selectedSubDistrict, setSelectedSubDistrict] = useState<string>("");
+  const [selectedVillage, setSelectedVillage] = useState<string>("");
 
   const searchResults = useMemo(
     () => (query.length > 0 ? searchRegions(query) : null),
@@ -21,8 +36,42 @@ export function RegionSidebar() {
     if (region) {
       setSelectedRegion(region);
       setQuery("");
+      // Update dropdown selections to match
+      setSelectedDistrict(region.district);
+      setSelectedSubDistrict(region.subDistrict);
+      setSelectedVillage(region.name);
     }
   };
+
+  // Handle dropdown selections
+  const handleDistrictChange = (districtName: string) => {
+    setSelectedDistrict(districtName);
+    setSelectedSubDistrict("");
+    setSelectedVillage("");
+  };
+
+  const handleSubDistrictChange = (subDistrictName: string) => {
+    setSelectedSubDistrict(subDistrictName);
+    setSelectedVillage("");
+  };
+
+  const handleVillageChange = (villageName: string) => {
+    setSelectedVillage(villageName);
+    // Find and select the region
+    const region = regions.find(r => 
+      r.district === selectedDistrict && 
+      r.subDistrict === selectedSubDistrict && 
+      r.name === villageName
+    );
+    if (region) {
+      setSelectedRegion(region);
+    }
+  };
+
+  // Get filtered options for dropdowns
+  const selectedDistrictData = maharashtraDistricts.find(d => d.name === selectedDistrict);
+  const selectedSubDistrictData = selectedDistrictData?.subDistricts.find(sd => sd.name === selectedSubDistrict);
+  const availableVillages = selectedSubDistrictData?.villages || [];
 
   return (
     <aside className="flex flex-col h-full glass-strong rounded-xl overflow-hidden">
@@ -43,6 +92,108 @@ export function RegionSidebar() {
           />
         </div>
       </div>
+
+      {/* Hierarchical Dropdown Selectors */}
+      <div className="px-4 pt-3 pb-2 border-b border-border/30">
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
+          <MapPin className="h-3 w-3" />
+          <span className="uppercase tracking-wider font-medium">Regional Selection</span>
+        </div>
+        <div className="space-y-2">
+          {/* District Dropdown */}
+          <div>
+            <Label htmlFor="district-select" className="text-xs text-muted-foreground mb-1 block">District</Label>
+            <Select value={selectedDistrict} onValueChange={handleDistrictChange}>
+              <SelectTrigger id="district-select" className="bg-secondary/50 border-border/50 text-sm">
+                <SelectValue placeholder="Select district" />
+              </SelectTrigger>
+              <SelectContent>
+                {maharashtraDistricts.map((district) => (
+                  <SelectItem key={district.id} value={district.name}>
+                    {district.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Sub-district Dropdown */}
+          <div>
+            <Label htmlFor="subdistrict-select" className="text-xs text-muted-foreground mb-1 block">Sub-district</Label>
+            <Select value={selectedSubDistrict} onValueChange={handleSubDistrictChange} disabled={!selectedDistrict}>
+              <SelectTrigger id="subdistrict-select" className="bg-secondary/50 border-border/50 text-sm">
+                <SelectValue placeholder="Select sub-district" />
+              </SelectTrigger>
+              <SelectContent>
+                {selectedDistrictData?.subDistricts.map((sub) => (
+                  <SelectItem key={sub.id} value={sub.name}>
+                    {sub.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Village Dropdown */}
+          <div>
+            <Label htmlFor="village-select" className="text-xs text-muted-foreground mb-1 block">Village</Label>
+            <Select value={selectedVillage} onValueChange={handleVillageChange} disabled={!selectedSubDistrict}>
+              <SelectTrigger id="village-select" className="bg-secondary/50 border-border/50 text-sm">
+                <SelectValue placeholder="Select village" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableVillages.map((village) => (
+                  <SelectItem key={village.id} value={village.name}>
+                    {village.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+
+      {/* Month & Year Selectors */}
+      {selectedRegion && (
+        <div className="px-4 pt-3 pb-2 border-b border-border/30">
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
+            <Calendar className="h-3 w-3" />
+            <span className="uppercase tracking-wider font-medium">Monthly Drill-Down</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <Label htmlFor="month-select" className="text-xs text-muted-foreground mb-1 block">Month</Label>
+              <Select value={selectedMonth?.toString() || ""} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                <SelectTrigger id="month-select" className="bg-secondary/50 border-border/50 text-sm">
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"].map((month, index) => (
+                    <SelectItem key={index + 1} value={(index + 1).toString()}>
+                      {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="year-select" className="text-xs text-muted-foreground mb-1 block">Year</Label>
+              <Select value={selectedYear?.toString() || ""} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                <SelectTrigger id="year-select" className="bg-secondary/50 border-border/50 text-sm">
+                  <SelectValue placeholder="Select year" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 19 }, (_, i) => 2016 + i).map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Session History */}
       {sessionHistory.length > 0 && !query && (

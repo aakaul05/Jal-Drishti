@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jal-Drishti - Supabase Setup</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body { font-family: system-ui; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .card { border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .hierarchy { font-family: monospace; line-height: 1.4; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Jal-Drishti - Maharashtra Data Setup</h1>
+    
+    <div id="status" class="card info">
+        <h3>🔍 Initializing...</h3>
+        <p>Setting up Supabase connection and creating schema...</p>
+    </div>
+    
+    <div id="actions" style="display: none;">
+        <button onclick="showHierarchy()">📊 Show Hierarchy</button>
+        <button onclick="startApp()">🎯 Start Application</button>
+    </div>
+    
+    <div id="hierarchy" style="display: none;" class="card">
+        <h3>🗺️ Maharashtra Regional Hierarchy</h3>
+        <div id="hierarchyContent" class="hierarchy"></div>
+    </div>
+
+    <script>
+        const { createClient } = supabase;
+        const supabaseUrl = 'https://reaubfkawbovjhpurtbx.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJlYXViZmthd2JvdmpocHVydGJ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MTAwMDMsImV4cCI6MjA5MDA4NjAwM30.64igBjud8qczrwK1k51bJdJoPHqntwWZ2cjbw2lhQfA';
+        const supabase = createClient(supabaseUrl, supabaseKey);
+
+        const maharashtraData = {
+            districts: [
+                { district_code: 490, district_name: 'Pune', census_2001_code: 25, census_2011_code: 521 },
+                { district_code: 487, district_name: 'Nashik', census_2001_code: 20, census_2011_code: 516 },
+                { district_code: 469, district_name: 'Chhatrapati Sambhajinagar', census_2001_code: 19, census_2011_code: 515 },
+                { district_code: 496, district_name: 'Solapur', census_2001_code: 30, census_2011_code: 526 },
+                { district_code: 480, district_name: 'Kolhapur', census_2001_code: 34, census_2011_code: 530 },
+                { district_code: 466, district_name: 'Ahilyanagar', census_2001_code: 26, census_2011_code: 522 },
+                { district_code: 467, district_name: 'Akola', census_2001_code: 5, census_2011_code: 501 },
+                { district_code: 468, district_name: 'Amravati', census_2001_code: 7, census_2011_code: 503 },
+                { district_code: 470, district_name: 'Beed', census_2001_code: 27, census_2011_code: 523 },
+                { district_code: 471, district_name: 'Bhandara', census_2001_code: 10, census_2011_code: 506 }
+            ],
+            
+            subDistricts: [
+                { subdistrict_code: 4193, subdistrict_name: 'Haveli', district_code: 490, district_name: 'Pune' },
+                { subdistrict_code: 4199, subdistrict_name: 'Baramati', district_code: 490, district_name: 'Pune' },
+                { subdistrict_code: 4191, subdistrict_name: 'Pune City', district_code: 490, district_name: 'Pune' },
+                { subdistrict_code: 4145, subdistrict_name: 'Baglan', district_code: 487, district_name: 'Nashik' },
+                { subdistrict_code: 4147, subdistrict_name: 'Nandgaon', district_code: 487, district_name: 'Nashik' },
+                { subdistrict_code: 4137, subdistrict_name: 'Chhatrapati Sambhajinagar', district_code: 469, district_name: 'Chhatrapati Sambhajinagar' },
+                { subdistrict_code: 4254, subdistrict_name: 'Akkalkot', district_code: 496, district_name: 'Solapur' },
+                { subdistrict_code: 4255, subdistrict_name: 'Barshi', district_code: 496, district_name: 'Solapur' },
+                { subdistrict_code: 4292, subdistrict_name: 'Ajra', district_code: 480, district_name: 'Kolhapur' },
+                { subdistrict_code: 4293, subdistrict_name: 'Kagal', district_code: 480, district_name: 'Kolhapur' },
+                { subdistrict_code: 4201, subdistrict_name: 'Akole', district_code: 466, district_name: 'Ahilyanagar' }
+            ],
+            
+            villages: [
+                { village_code: 557001, village_name: 'Wagholi', subdistrict_code: 4193, district_code: 490 },
+                { village_code: 557002, village_name: 'Lohegaon', subdistrict_code: 4193, district_code: 490 },
+                { village_code: 557003, village_name: 'Kharadi', subdistrict_code: 4193, district_code: 490 },
+                { village_code: 557004, village_name: 'Kondhwa', subdistrict_code: 4193, district_code: 490 },
+                { village_code: 557005, village_name: 'Hadapsar', subdistrict_code: 4193, district_code: 490 },
+                { village_code: 557006, village_name: 'Baramati Town', subdistrict_code: 4199, district_code: 490 },
+                { village_code: 557007, village_name: 'Jejuri', subdistrict_code: 4199, district_code: 490 },
+                { village_code: 557008, village_name: 'Supa', subdistrict_code: 4199, district_code: 490 },
+                { village_code: 557009, village_name: 'Nira', subdistrict_code: 4199, district_code: 490 },
+                { village_code: 557010, village_name: 'Malshiras', subdistrict_code: 4199, district_code: 490 },
+                { village_code: 557011, village_name: 'Akole Town', subdistrict_code: 4201, district_code: 466 },
+                { village_code: 557012, village_name: 'Rajur', subdistrict_code: 4201, district_code: 466 },
+                { village_code: 557013, village_name: 'Lohgad', subdistrict_code: 4201, district_code: 466 },
+                { village_code: 557014, village_name: 'Ambivali', subdistrict_code: 4201, district_code: 466 },
+                { village_code: 557015, village_name: 'Pachod', subdistrict_code: 4201, district_code: 466 }
+            ]
+        };
+
+        function updateStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `card ${type}`;
+            statusDiv.innerHTML = `<h3>${type === 'success' ? '✅' : type === 'error' ? '❌' : '🔍'} ${message}</h3>`;
+        }
+
+        async function setupDatabase() {
+            try {
+                updateStatus('Testing Supabase connection...', 'info');
+                
+                // Test connection
+                const { data, error } = await supabase.from('mh_districts').select('count').limit(1);
+                
+                if (error) {
+                    updateStatus('Creating database schema...', 'info');
+                    await createSchema();
+                } else {
+                    updateStatus('Connection successful! Checking data...', 'info');
+                    await checkAndMigrateData();
+                }
+                
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createSchema() {
+            try {
+                // Note: In a real scenario, you'd need admin privileges to create tables
+                // For now, we'll show the SQL that needs to be run in Supabase SQL Editor
+                updateStatus('Tables need to be created manually. Please run the SQL in Supabase SQL Editor.', 'info');
+                
+                const sql = `
+-- DISTRICTS TABLE
+CREATE TABLE IF NOT EXISTS mh_districts (
+    id SERIAL PRIMARY KEY,
+    district_code INTEGER NOT NULL UNIQUE,
+    district_version INTEGER,
+    district_name TEXT NOT NULL,
+    state_code INTEGER NOT NULL DEFAULT 27,
+    state_name TEXT NOT NULL DEFAULT 'Maharashtra',
+    census_2001_code INTEGER,
+    census_2011_code INTEGER,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- SUBDISTRICTS TABLE
+CREATE TABLE IF NOT EXISTS mh_subdistricts (
+    id SERIAL PRIMARY KEY,
+    subdistrict_code INTEGER NOT NULL UNIQUE,
+    subdistrict_version INTEGER,
+    subdistrict_name TEXT NOT NULL,
+    district_code INTEGER NOT NULL REFERENCES mh_districts(district_code),
+    district_name TEXT NOT NULL,
+    census_2011_code TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- VILLAGES TABLE
+CREATE TABLE IF NOT EXISTS mh_villages (
+    id SERIAL PRIMARY KEY,
+    village_code BIGINT NOT NULL UNIQUE,
+    village_version INTEGER,
+    village_name TEXT NOT NULL,
+    subdistrict_code INTEGER NOT NULL REFERENCES mh_subdistricts(subdistrict_code),
+    district_code INTEGER NOT NULL REFERENCES mh_districts(district_code),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_mh_subdistricts_district ON mh_subdistricts(district_code);
+CREATE INDEX IF NOT EXISTS idx_mh_villages_subdistrict ON mh_villages(subdistrict_code);
+CREATE INDEX IF NOT EXISTS idx_mh_villages_district ON mh_villages(district_code);
+CREATE INDEX IF NOT EXISTS idx_mh_villages_name ON mh_villages(village_name);
+
+-- RLS Policies
+ALTER TABLE mh_districts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mh_subdistricts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE mh_villages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public read access for districts" ON mh_districts FOR SELECT USING (true);
+CREATE POLICY "Public read access for sub-districts" ON mh_subdistricts FOR SELECT USING (true);
+CREATE POLICY "Public read access for villages" ON mh_villages FOR SELECT USING (true);
+                `;
+                
+                document.getElementById('status').innerHTML += `
+                    <h4>📋 SQL Schema:</h4>
+                    <pre>${sql}</pre>
+                    <p><strong>Steps:</strong></p>
+                    <ol>
+                        <li>Go to your Supabase project → SQL Editor</li>
+                        <li>Copy and paste the SQL above</li>
+                        <li>Click "Run" to create tables</li>
+                        <li>Refresh this page to continue</li>
+                    </ol>
+                `;
+                
+            } catch (error) {
+                updateStatus(`Schema creation error: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkAndMigrateData() {
+            try {
+                // Check existing data
+                const [districts, subDistricts, villages] = await Promise.all([
+                    supabase.from('mh_districts').select('*', { count: 'exact', head: true }),
+                    supabase.from('mh_subdistricts').select('*', { count: 'exact', head: true }),
+                    supabase.from('mh_villages').select('*', { count: 'exact', head: true })
+                ]);
+                
+                const districtCount = districts.count || 0;
+                const subDistrictCount = subDistricts.count || 0;
+                const villageCount = villages.count || 0;
+                
+                if (districtCount === 0) {
+                    updateStatus('Migrating sample data...', 'info');
+                    await migrateData();
+                } else {
+                    updateStatus(`Data found: ${districtCount} districts, ${subDistrictCount} sub-districts, ${villageCount} villages`, 'success');
+                    showActions();
+                }
+                
+            } catch (error) {
+                updateStatus(`Data check error: ${error.message}`, 'error');
+            }
+        }
+
+        async function migrateData() {
+            try {
+                // Clear existing data
+                await supabase.from('mh_villages').delete().neq('village_code', 0);
+                await supabase.from('mh_subdistricts').delete().neq('subdistrict_code', 0);
+                await supabase.from('mh_districts').delete().neq('district_code', 0);
+                
+                // Insert districts
+                const { data: insertedDistricts } = await supabase
+                    .from('mh_districts')
+                    .insert(maharashtraData.districts)
+                    .select();
+                
+                // Insert sub-districts
+                const { data: insertedSubDistricts } = await supabase
+                    .from('mh_subdistricts')
+                    .insert(maharashtraData.subDistricts)
+                    .select();
+                
+                // Insert villages
+                const { data: insertedVillages } = await supabase
+                    .from('mh_villages')
+                    .insert(maharashtraData.villages)
+                    .select();
+                
+                updateStatus(`Migration complete! ${insertedDistricts?.length} districts, ${insertedSubDistricts?.length} sub-districts, ${insertedVillages?.length} villages`, 'success');
+                showActions();
+                
+            } catch (error) {
+                updateStatus(`Migration error: ${error.message}`, 'error');
+            }
+        }
+
+        function showActions() {
+            document.getElementById('actions').style.display = 'block';
+        }
+
+        async function showHierarchy() {
+            try {
+                const { data: districts } = await supabase
+                    .from('mh_districts')
+                    .select(`
+                        district_name,
+                        mh_subdistricts(
+                            subdistrict_name,
+                            mh_villages(
+                                village_name
+                            )
+                        )
+                    `)
+                    .order('district_name')
+                    .limit(5);
+                
+                let hierarchyHTML = '';
+                districts?.forEach((district, index) => {
+                    hierarchyHTML += `<br><strong>${index + 1}. 📍 ${district.district_name}</strong><br>`;
+                    
+                    district.mh_subdistricts?.forEach((subDistrict, subIndex) => {
+                        hierarchyHTML += `&nbsp;&nbsp;${index + 1}.${subIndex + 1} 🏘️ ${subDistrict.subdistrict_name}<br>`;
+                        
+                        subDistrict.mh_villages?.forEach((village, villageIndex) => {
+                            hierarchyHTML += `&nbsp;&nbsp;&nbsp;&nbsp;${index + 1}.${subIndex + 1}.${villageIndex + 1} 🏡 ${village.village_name}<br>`;
+                        });
+                    });
+                });
+                
+                document.getElementById('hierarchyContent').innerHTML = hierarchyHTML;
+                document.getElementById('hierarchy').style.display = 'block';
+                
+            } catch (error) {
+                alert('Error showing hierarchy: ' + error.message);
+            }
+        }
+
+        function startApp() {
+            alert('Perfect! Now run: npm run dev to start the Jal-Drishti application with live Maharashtra data!');
+        }
+
+        // Auto-start setup
+        setupDatabase();
+    </script>
+</body>
+</html>

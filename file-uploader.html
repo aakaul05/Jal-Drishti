@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>📁 File Upload - Jal-Drishti Data</title>
+    <style>
+        body { font-family: system-ui; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .card { border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .success { background: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .info { background: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        .upload-area { border: 2px dashed #007bff; padding: 40px; text-align: center; border-radius: 8px; margin: 20px 0; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        textarea { width: 100%; height: 300px; font-family: monospace; margin: 10px 0; }
+        .file-list { max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <h1>📁 Maharashtra Data Upload</h1>
+    
+    <div class="card info">
+        <h3>📋 Upload Your Data Files</h3>
+        <p>Supported formats: CSV, Excel (.xlsx, .xls), JSON, Text files</p>
+        <p>Maximum file size: 50MB per file</p>
+    </div>
+
+    <div class="card">
+        <h3>📤 Upload Files</h3>
+        <div class="upload-area" id="uploadArea">
+            <p>📁 Drag & drop files here or click to select</p>
+            <input type="file" id="fileInput" multiple accept=".csv,.xlsx,.xls,.json,.txt" style="display: none;">
+            <button onclick="document.getElementById('fileInput').click()">Select Files</button>
+        </div>
+        
+        <div id="fileList" class="file-list"></div>
+        <button onclick="processFiles()" style="display: none;" id="processBtn">🔄 Process Files</button>
+    </div>
+
+    <div class="card" id="outputCard" style="display: none;">
+        <h3>📊 Processed Data</h3>
+        <textarea id="outputData" readonly></textarea>
+        <button onclick="copyData()">📋 Copy</button>
+        <button onclick="downloadData()">💾 Download JSON</button>
+        <button onclick="useInMigration()">🚀 Use in Migration</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script>
+        let uploadedFiles = [];
+        let processedData = { districts: [], subDistricts: [], villages: [] };
+
+        // Setup drag and drop
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.style.background = '#e3f2fd';
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.style.background = 'white';
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.style.background = 'white';
+            handleFiles(e.dataTransfer.files);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            uploadedFiles = Array.from(files);
+            displayFileList();
+            document.getElementById('processBtn').style.display = 'block';
+        }
+
+        function displayFileList() {
+            const fileList = document.getElementById('fileList');
+            fileList.innerHTML = '<h4>📁 Uploaded Files:</h4>';
+            
+            uploadedFiles.forEach((file, index) => {
+                const fileDiv = document.createElement('div');
+                fileDiv.innerHTML = `
+                    <div style="padding: 5px; border-bottom: 1px solid #eee;">
+                        <strong>${file.name}</strong> (${(file.size / 1024 / 1024).toFixed(2)} MB)
+                        <button onclick="removeFile(${index})" style="float: right; background: #dc3545;">❌ Remove</button>
+                    </div>
+                `;
+                fileList.appendChild(fileDiv);
+            });
+        }
+
+        function removeFile(index) {
+            uploadedFiles.splice(index, 1);
+            displayFileList();
+            if (uploadedFiles.length === 0) {
+                document.getElementById('processBtn').style.display = 'none';
+            }
+        }
+
+        async function processFiles() {
+            console.log('🔄 Processing files...');
+            
+            for (const file of uploadedFiles) {
+                console.log(`📁 Processing: ${file.name}`);
+                
+                if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+                    await processTextFile(file);
+                } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+                    await processExcelFile(file);
+                } else if (file.name.endsWith('.json')) {
+                    await processJsonFile(file);
+                }
+            }
+            
+            displayProcessedData();
+        }
+
+        async function processTextFile(file) {
+            const text = await file.text();
+            const lines = text.split('\n').filter(line => line.trim());
+            
+            lines.forEach(line => {
+                const parts = line.split(',').map(p => p.trim());
+                if (parts.length >= 2) {
+                    // Try to determine if it's district, sub-district, or village
+                    if (parts[0].length <= 3 && parseInt(parts[0])) {
+                        // Likely district
+                        processedData.districts.push({
+                            district_code: parseInt(parts[0]),
+                            district_name: parts[1],
+                            census_2001_code: parts[2] ? parseInt(parts[2]) : null,
+                            census_2011_code: parts[3] ? parseInt(parts[3]) : null
+                        });
+                    } else if (parts[0].length <= 4 && parseInt(parts[0])) {
+                        // Likely sub-district
+                        processedData.subDistricts.push({
+                            subdistrict_code: parseInt(parts[0]),
+                            subdistrict_name: parts[1],
+                            district_code: parseInt(parts[2]),
+                            district_name: parts[3] || '',
+                            census_2011_code: parts[4] || null
+                        });
+                    } else if (parts[0].length >= 6 && parseInt(parts[0])) {
+                        // Likely village
+                        processedData.villages.push({
+                            village_code: parseInt(parts[0]),
+                            village_name: parts[1],
+                            subdistrict_code: parseInt(parts[2]),
+                            district_code: parseInt(parts[3])
+                        });
+                    }
+                }
+            });
+        }
+
+        async function processExcelFile(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const workbook = XLSX.read(arrayBuffer, { type: 'array' });
+            
+            workbook.SheetNames.forEach(sheetName => {
+                const worksheet = workbook.Sheets[sheetName];
+                const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                
+                data.forEach((row, index) => {
+                    if (index === 0) return; // Skip header
+                    
+                    if (row.length >= 2 && row[0] && row[1]) {
+                        // Determine data type based on content
+                        if (typeof row[0] === 'number' && row[0] < 1000) {
+                            // District
+                            processedData.districts.push({
+                                district_code: row[0],
+                                district_name: row[1],
+                                census_2001_code: row[2] || null,
+                                census_2011_code: row[3] || null
+                            });
+                        } else if (typeof row[0] === 'number' && row[0] < 10000) {
+                            // Sub-district
+                            processedData.subDistricts.push({
+                                subdistrict_code: row[0],
+                                subdistrict_name: row[1],
+                                district_code: row[2] || null,
+                                district_name: row[3] || '',
+                                census_2011_code: row[4] || null
+                            });
+                        } else if (typeof row[0] === 'number' && row[0] > 100000) {
+                            // Village
+                            processedData.villages.push({
+                                village_code: row[0],
+                                village_name: row[1],
+                                subdistrict_code: row[2] || null,
+                                district_code: row[3] || null
+                            });
+                        }
+                    }
+                });
+            });
+        }
+
+        async function processJsonFile(file) {
+            const text = await file.text();
+            try {
+                const data = JSON.parse(text);
+                
+                // Merge with existing data
+                if (data.districts) processedData.districts.push(...data.districts);
+                if (data.subDistricts) processedData.subDistricts.push(...data.subDistricts);
+                if (data.villages) processedData.villages.push(...data.villages);
+            } catch (error) {
+                console.error('Error parsing JSON:', error);
+            }
+        }
+
+        function displayProcessedData() {
+            const outputData = document.getElementById('outputData');
+            outputData.value = JSON.stringify(processedData, null, 2);
+            document.getElementById('outputCard').style.display = 'block';
+            
+            console.log('✅ Processing complete!');
+            console.log(`📊 Results: ${processedData.districts.length} districts, ${processedData.subDistricts.length} sub-districts, ${processedData.villages.length} villages`);
+        }
+
+        function copyData() {
+            navigator.clipboard.writeText(JSON.stringify(processedData, null, 2));
+            alert('📋 Data copied to clipboard!');
+        }
+
+        function downloadData() {
+            const data = JSON.stringify(processedData, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'maharashtra-data.json';
+            a.click();
+        }
+
+        function useInMigration() {
+            alert('🚀 Data ready! Copy this data and replace the sample data in scripts/completeSetup.js, then run: npm run migrate:maharashtra');
+        }
+    </script>
+</body>
+</html>

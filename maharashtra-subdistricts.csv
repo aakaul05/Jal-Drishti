@@ -1,0 +1,34 @@
+subdistrict_code,subdistrict_name,district_code,district_name,census_2011_code
+4191,Pune City,490,Pune,04191
+4192,Pimpri-Chinchwad,490,Pune,04192
+4193,Haveli,490,Pune,04193
+4194,Khed,490,Pune,04194
+4195,Junnar,490,Pune,04195
+4196,Ambegaon,490,Pune,04196
+4197,Maval,490,Pune,04197
+4198,Mulshi,490,Pune,04198
+4199,Baramati,490,Pune,04199
+4200,Indapur,490,Pune,04200
+4201,Akole,466,Ahilyanagar,04201
+4202,Karjat,466,Ahilyanagar,04202
+4203,Sangamner,466,Ahilyanagar,04203
+4204,Shrigonda,466,Ahilyanagar,04204
+4205,Shirur,466,Ahilyanagar,04205
+4206,Parner,466,Ahilyanagar,04206
+4207,Pathardi,466,Ahilyanagar,04207
+4208,Shevgaon,466,Ahilyanagar,04208
+4209,Rahata,466,Ahilyanagar,04209
+4210,Kopargaon,466,Ahilyanagar,04210
+4211,Shevgaon,466,Ahilyanagar,04211
+4212,Akole,466,Ahilyanagar,04212
+4213,Karjat,466,Ahilyanagar,04213
+4214,Sangamner,466,Ahilyanagar,04214
+4215,Shrigonda,466,Ahilyanagar,04215
+4216,Shirur,466,Ahilyanagar,04216
+4217,Parner,466,Ahilyanagar,04217
+4218,Pathardi,466,Ahilyanagar,04218
+4219,Shevgaon,466,Ahilyanagar,04219
+4220,Rahata,466,Ahilyanagar,04220
+4221,Kopargaon,466,Ahilyanagar,04221
+# Add all 358 sub-districts here...
+# This is just a sample - you need to add all your sub-districts

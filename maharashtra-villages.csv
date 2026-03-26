@@ -1,0 +1,18 @@
+village_code,village_name,subdistrict_code,district_code
+557001,Wagholi,4193,490
+557002,Lohegaon,4193,490
+557003,Kharadi,4193,490
+557004,Kondhwa,4193,490
+557005,Hadapsar,4193,490
+557006,Baramati Town,4199,490
+557007,Jejuri,4199,490
+557008,Supa,4199,490
+557009,Nira,4199,490
+557010,Malshiras,4199,490
+557011,Akole Town,4201,466
+557012,Rajur,4201,466
+557013,Lohgad,4201,466
+557014,Ambivali,4201,466
+557015,Pachod,4201,466
+# Add all 44,806 villages here...
+# This is just a sample - you need to add all your villages

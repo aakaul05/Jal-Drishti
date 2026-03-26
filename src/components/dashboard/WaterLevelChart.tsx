@@ -1,12 +1,16 @@
 import { useMemo } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Area, ComposedChart, ReferenceLine,
+  Area, ComposedChart, ReferenceLine, ReferenceDot,
 } from "recharts";
 import { useDashboard } from "@/context/DashboardContext";
 import { Skeleton } from "@/components/ui/skeleton";
 
-function CustomTooltip({ active, payload, label }: any) {
+function CustomTooltip({ active, payload, label }: {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}) {
   if (!active || !payload?.length) return null;
   const point = payload[0]?.payload;
   return (
@@ -30,7 +34,14 @@ function CustomTooltip({ active, payload, label }: any) {
 }
 
 export function WaterLevelChart() {
-  const { predictionData, isLoading, selectedRegion } = useDashboard();
+  const { 
+    predictionData, 
+    isLoading, 
+    selectedRegion, 
+    selectedMonth, 
+    selectedYear, 
+    monthlyData 
+  } = useDashboard();
 
   const chartData = useMemo(() => {
     if (!predictionData) return [];
@@ -58,6 +69,21 @@ export function WaterLevelChart() {
     }
     return [...historical, ...predicted];
   }, [predictionData]);
+
+  // Calculate monthly highlight position
+  const monthlyHighlight = useMemo(() => {
+    if (!selectedMonth || !selectedYear || !monthlyData) return null;
+    
+    // Find the position on the chart for the selected year
+    const yearData = chartData.find(d => d.year === selectedYear);
+    if (!yearData) return null;
+    
+    return {
+      x: selectedYear,
+      y: monthlyData.exact_depth,
+      depth: monthlyData.exact_depth,
+    };
+  }, [selectedMonth, selectedYear, monthlyData, chartData]);
 
   if (!selectedRegion) {
     return (
@@ -164,6 +190,19 @@ export function WaterLevelChart() {
               activeDot={{ r: 5, fill: "hsl(145,100%,50%)", stroke: "hsl(145,100%,70%)", strokeWidth: 2 }}
               connectNulls={false}
             />
+            
+            {/* Monthly highlight dot */}
+            {monthlyHighlight && (
+              <ReferenceDot
+                x={monthlyHighlight.x}
+                y={monthlyHighlight.y}
+                r={8}
+                fill="hsl(340,100%,50%)"
+                stroke="hsl(340,100%,70%)"
+                strokeWidth={3}
+                className="animate-pulse"
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
