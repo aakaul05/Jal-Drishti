@@ -1,0 +1,114 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    --background: 222 59% 7%;
+    --foreground: 210 40% 92%;
+
+    --card: 222 40% 12%;
+    --card-foreground: 210 40% 92%;
+
+    --popover: 222 40% 12%;
+    --popover-foreground: 210 40% 92%;
+
+    --primary: 170 100% 33%;
+    --primary-foreground: 222 59% 7%;
+
+    --secondary: 222 30% 18%;
+    --secondary-foreground: 210 40% 92%;
+
+    --muted: 222 30% 15%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 170 100% 33%;
+    --accent-foreground: 222 59% 7%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 222 30% 20%;
+    --input: 222 30% 20%;
+    --ring: 170 100% 33%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 222 45% 9%;
+    --sidebar-foreground: 210 40% 85%;
+    --sidebar-primary: 170 100% 33%;
+    --sidebar-primary-foreground: 222 59% 7%;
+    --sidebar-accent: 222 30% 15%;
+    --sidebar-accent-foreground: 210 40% 85%;
+    --sidebar-border: 222 30% 18%;
+    --sidebar-ring: 170 100% 33%;
+
+    /* Custom tokens */
+    --cyan-glow: 185 100% 50%;
+    --neon-green: 145 100% 50%;
+    --risk-low: 145 60% 45%;
+    --risk-moderate: 45 100% 50%;
+    --risk-high: 25 100% 55%;
+    --risk-severe: 0 84% 55%;
+    --glass-bg: 222 40% 12% / 0.6;
+    --glass-border: 222 30% 25% / 0.3;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+}
+
+@layer utilities {
+  .glass {
+    background: hsla(var(--glass-bg));
+    backdrop-filter: blur(16px);
+    border: 1px solid hsla(var(--glass-border));
+  }
+
+  .glass-strong {
+    background: hsla(222, 40%, 12%, 0.85);
+    backdrop-filter: blur(24px);
+    border: 1px solid hsla(222, 30%, 25%, 0.4);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px hsla(170, 100%, 33%, 0.15),
+                0 0 40px hsla(170, 100%, 33%, 0.05);
+  }
+
+  .glow-cyan {
+    filter: drop-shadow(0 0 6px hsla(185, 100%, 50%, 0.6));
+  }
+
+  .glow-green {
+    filter: drop-shadow(0 0 6px hsla(145, 100%, 50%, 0.6));
+  }
+
+  @keyframes pulse-slow {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  .animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+  }
+
+  @keyframes slide-up {
+    from { transform: translateY(8px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+  }
+}
