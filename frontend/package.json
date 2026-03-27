@@ -14,8 +14,7 @@
     "test:connection": "node scripts/testConnection.js",
     "migrate:maharashtra": "node scripts/migrateMaharashtraComplete.js",
     "show:hierarchy": "node scripts/showHierarchy.js",
-    "show:full-hierarchy": "node scripts/showHierarchy.js full",
-    "setup:supabase": "node scripts/setupSupabase.js"
+    "show:full-hierarchy": "node scripts/showHierarchy.js full"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
