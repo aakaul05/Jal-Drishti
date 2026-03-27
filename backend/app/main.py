@@ -76,3 +76,18 @@ def predict_monthly(payload: MonthlyPredictRequest) -> Any:
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Monthly prediction failed: {e}")
 
+
+@app.get("/api/locations/districts")
+def get_districts_with_hierarchy() -> Any:
+    return location_store.get_districts_with_hierarchy()
+
+
+@app.get("/api/locations/subdistricts/{district_code}")
+def get_subdistricts(district_code: str) -> Any:
+    return location_store.get_subdistricts(district_code)
+
+
+@app.get("/api/locations/villages/{subdistrict_code}")
+def get_villages(subdistrict_code: str) -> Any:
+    return location_store.get_villages(subdistrict_code)
+

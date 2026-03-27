@@ -236,25 +236,36 @@ function hashId(id: string): number {
 }
 
 const dataCache = new Map<string, PredictionResult>();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-export function fetchRegionData(regionId: string): Promise<PredictionResult> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      if (dataCache.has(regionId)) {
-        resolve(dataCache.get(regionId)!);
-        return;
-      }
-      const h = hashId(regionId);
-      const baseDepth = 20 + (h % 60);
-      const rate = ((h % 20) / 10) - 0.5; // -0.5 to 1.5
-      const noise = 1 + (h % 4);
-      const region = regions.find((r) => r.id === regionId) || regions[0];
-      const result = generateRegionData(baseDepth, rate, noise);
-      result.region = region;
-      dataCache.set(regionId, result);
-      resolve(result);
-    }, 600 + Math.random() * 500);
-  });
+export async function fetchRegionData(regionId: string): Promise<PredictionResult> {
+  if (dataCache.has(regionId)) {
+    return dataCache.get(regionId)!;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/predict/annual`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ region: regionId }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const result = (await response.json()) as PredictionResult;
+    dataCache.set(regionId, result);
+    return result;
+  } catch {
+    const h = hashId(regionId);
+    const baseDepth = 20 + (h % 60);
+    const rate = ((h % 20) / 10) - 0.5; // -0.5 to 1.5
+    const noise = 1 + (h % 4);
+    const region = regions.find((r) => r.id === regionId) || regions[0];
+    const fallback = generateRegionData(baseDepth, rate, noise);
+    fallback.region = region;
+    dataCache.set(regionId, fallback);
+    return fallback;
+  }
 }
 
 export function searchRegions(query: string): Region[] {
@@ -267,48 +278,31 @@ export function searchRegions(query: string): Region[] {
   );
 }
 
-export function fetchMonthlyData(regionId: string, year: number, month: number): Promise<MonthlyPredictionResult> {
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Generate deterministic monthly prediction based on region, year, and month
-      const h = hashId(regionId + year.toString() + month.toString());
-      const baseDepth = 20 + (h % 60);
-      const annualRate = ((h % 20) / 10) - 0.5;
-      
-      // Seasonal adjustment based on month
-      const seasonalFactors = [0.8, 0.7, 0.6, 0.5, 0.4, 0.5, 0.6, 0.8, 1.0, 1.1, 1.0, 0.9];
-      const seasonalFactor = seasonalFactors[month - 1];
-      
-      const exactDepth = baseDepth + annualRate * (year - 2026) + (Math.random() - 0.5) * 2 + seasonalFactor * 5;
-      const monthlyChangeRate = annualRate / 12 + (Math.random() - 0.5) * 0.1;
-      
-      // Generate insights based on conditions
-      const insights: string[] = [];
-      insights.push(`Expected Depth: ${exactDepth.toFixed(2)} ft`);
-      
-      if (month >= 4 && month <= 6) {
-        insights.push("Seasonal Context: Pre-monsoon peak depletion phase");
-        insights.push("Actionable Step: Avoid heavy pumping during this 30-day window");
-      } else if (month >= 7 && month <= 9) {
-        insights.push("Seasonal Context: Monsoon recharge period");
-        insights.push("Actionable Step: Optimize pumping during peak recharge");
-      } else if (month >= 10 && month <= 12) {
-        insights.push("Seasonal Context: Post-monsoon recovery phase");
-        insights.push("Actionable Step: Moderate extraction rates recommended");
-      } else {
-        insights.push("Seasonal Context: Winter stable period");
-        insights.push("Actionable Step: Maintain current extraction patterns");
-      }
-      
-      if (exactDepth > 80) {
-        insights.push("⚠️ Warning: Approaching bedrock limit - Pump burnout risk");
-      }
-      
-      resolve({
-        exact_depth: Math.round(exactDepth * 100) / 100,
-        monthly_change_rate: Math.round(monthlyChangeRate * 1000) / 1000,
-        pointwise_insights: insights,
-      });
-    }, 400 + Math.random() * 300);
-  });
+export async function fetchMonthlyData(regionId: string, year: number, month: number): Promise<MonthlyPredictionResult> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/predict/monthly`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ region: regionId, year, month }),
+    });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return (await response.json()) as MonthlyPredictionResult;
+  } catch {
+    // Deterministic fallback if backend is unavailable
+    const h = hashId(regionId + year.toString() + month.toString());
+    const baseDepth = 20 + (h % 60);
+    const annualRate = ((h % 20) / 10) - 0.5;
+    const seasonalFactors = [0.8, 0.7, 0.6, 0.5, 0.4, 0.5, 0.6, 0.8, 1.0, 1.1, 1.0, 0.9];
+    const seasonalFactor = seasonalFactors[month - 1];
+    const exactDepth = baseDepth + annualRate * (year - 2026) + (Math.random() - 0.5) * 2 + seasonalFactor * 5;
+    const monthlyChangeRate = annualRate / 12 + (Math.random() - 0.5) * 0.1;
+
+    return {
+      exact_depth: Math.round(exactDepth * 100) / 100,
+      monthly_change_rate: Math.round(monthlyChangeRate * 1000) / 1000,
+      pointwise_insights: [`Expected Depth: ${exactDepth.toFixed(2)} ft`],
+    };
+  }
 }

@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useDashboard } from '@/context/DashboardContext';
 import { RegionalDataService } from '@/services/regionalDataService';
-import type { MhDistrict, MhSubDistrict, MhVillage, MhDistrictWithSubDistricts } from '@/lib/supabase';
+import type { MhDistrict, MhSubDistrict, MhVillage, MhDistrictWithSubDistricts } from '@/services/regionalDataService';
 
 export function RegionSidebarWithChart() {
   const { setSelectedRegion, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear } = useDashboard();
@@ -81,11 +81,12 @@ export function RegionSidebarWithChart() {
   // Handle village selection - update dashboard context
   const handleVillageChange = (villageName: string) => {
     setSelectedVillage(villageName);
-    
+
     // Update dashboard context with selected region
     if (villageName && selectedDistrict && selectedSubDistrict) {
+      const selectedVillageData = villages.find((v) => v.village_name === villageName);
       const region = {
-        id: `${selectedDistrict}-${selectedSubDistrict}-${villageName}`,
+        id: selectedVillageData?.village_code?.toString() ?? villageName,
         name: villageName,
         village: villageName,
         subDistrict: selectedSubDistrict,

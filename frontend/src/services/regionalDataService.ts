@@ -1,128 +1,118 @@
-import { supabase, MhDistrict, MhSubDistrict, MhVillage, MhDistrictWithSubDistricts } from '@/lib/supabase';
+export interface MhDistrict {
+  district_code: number | string;
+  district_name: string;
+}
+
+export interface MhSubDistrict {
+  subdistrict_code: number | string;
+  subdistrict_name: string;
+  district_code: number | string;
+  district_name: string;
+  census_2011_code?: string;
+}
+
+export interface MhVillage {
+  village_code: bigint | number | string;
+  village_name: string;
+  subdistrict_code: number | string;
+  district_code: number | string;
+  mh_subdistricts?: {
+    subdistrict_name: string;
+    district_name: string;
+  };
+}
+
+export interface MhDistrictWithSubDistricts extends MhDistrict {
+  mh_subdistricts: MhSubDistrict[];
+}
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export class RegionalDataService {
-  // Fetch all districts from Maharashtra
-  static async getDistricts(): Promise<MhDistrict[]> {
-    const { data, error } = await supabase
-      .from('mh_districts')
-      .select('*')
-      .order('district_name');
-
-    if (error) throw error;
-    return data || [];
+  private static async get<T>(path: string): Promise<T> {
+    const response = await fetch(`${API_BASE_URL}${path}`);
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+    }
+    return response.json() as Promise<T>;
   }
 
-  // Fetch districts with their sub-districts (hierarchical) - villages excluded for now
-  static async getDistrictsWithHierarchy(): Promise<MhDistrictWithSubDistricts[]> {
-    const { data, error } = await supabase
-      .from('mh_districts')
-      .select(`
-        *,
-        mh_subdistricts(
-          subdistrict_code,
-          subdistrict_name,
-          district_code,
-          district_name,
-          census_2011_code
-        )
-      `)
-      .order('district_name');
+  // Fetch all districts from backend
+  static async getDistricts(): Promise<MhDistrict[]> {
+    const data = await this.get<MhDistrictWithSubDistricts[]>('/api/locations/districts');
+    return data.map((d) => ({
+      district_code: d.district_code,
+      district_name: d.district_name,
+    }));
+  }
 
-    if (error) throw error;
-    return data || [];
+  // Fetch districts with their sub-districts (hierarchical)
+  static async getDistrictsWithHierarchy(): Promise<MhDistrictWithSubDistricts[]> {
+    return this.get<MhDistrictWithSubDistricts[]>('/api/locations/districts');
   }
 
   // Fetch sub-districts for a specific district
-  static async getSubDistricts(districtCode: number): Promise<MhSubDistrict[]> {
-    const { data, error } = await supabase
-      .from('mh_subdistricts')
-      .select('*')
-      .eq('district_code', districtCode)
-      .order('subdistrict_name');
-
-    if (error) throw error;
-    return data || [];
+  static async getSubDistricts(districtCode: number | string): Promise<MhSubDistrict[]> {
+    return this.get<MhSubDistrict[]>(`/api/locations/subdistricts/${districtCode}`);
   }
 
   // Fetch villages for a specific sub-district
-  static async getVillages(subDistrictCode: number): Promise<MhVillage[]> {
-    const { data, error } = await supabase
-      .from('mh_villages')
-      .select('*')
-      .eq('subdistrict_code', subDistrictCode)
-      .order('village_name');
-
-    if (error) throw error;
-    return data || [];
+  static async getVillages(subDistrictCode: number | string): Promise<MhVillage[]> {
+    return this.get<MhVillage[]>(`/api/locations/villages/${subDistrictCode}`);
   }
 
-  // Search villages by name across all sub-districts
+  // Search villages by name across already loaded district hierarchy
   static async searchVillages(query: string): Promise<MhVillage[]> {
-    const { data, error } = await supabase
-      .from('mh_villages')
-      .select(`
-        *,
-        mh_subdistricts(
-          subdistrict_name,
-          district_code,
-          district_name,
-          mh_districts(
-            district_name
-          )
-        )
-      `)
-      .ilike('village_name', `%${query}%`)
-      .limit(20)
-      .order('village_name');
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return [];
 
-    if (error) throw error;
-    return data || [];
+    const districts = await this.getDistrictsWithHierarchy();
+    const matches: MhVillage[] = [];
+
+    for (const district of districts) {
+      for (const sub of district.mh_subdistricts || []) {
+        const villages = await this.getVillages(sub.subdistrict_code);
+        for (const village of villages) {
+          if (village.village_name.toLowerCase().includes(normalized)) {
+            matches.push(village);
+            if (matches.length >= 20) return matches;
+          }
+        }
+      }
+    }
+
+    return matches;
   }
 
   // Get village by ID with full hierarchy
-  static async getVillageById(villageCode: bigint) {
-    const { data, error } = await supabase
-      .from('mh_villages')
-      .select(`
-        *,
-        mh_subdistricts(
-          subdistrict_name,
-          district_code,
-          district_name,
-          mh_districts(
-            district_name
-          )
-        )
-      `)
-      .eq('village_code', villageCode)
-      .single();
-
-    if (error) throw error;
-    return data;
+  static async getVillageById(villageCode: bigint | number | string) {
+    const districts = await this.getDistrictsWithHierarchy();
+    for (const district of districts) {
+      for (const sub of district.mh_subdistricts || []) {
+        const villages = await this.getVillages(sub.subdistrict_code);
+        const found = villages.find((v) => v.village_code.toString() === villageCode.toString());
+        if (found) return found;
+      }
+    }
+    return null;
   }
 
   // Get district by code
-  static async getDistrictByCode(districtCode: number): Promise<MhDistrict | null> {
-    const { data, error } = await supabase
-      .from('mh_districts')
-      .select('*')
-      .eq('district_code', districtCode)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
-    return data;
+  static async getDistrictByCode(districtCode: number | string): Promise<MhDistrict | null> {
+    const districts = await this.getDistricts();
+    return districts.find((d) => d.district_code.toString() === districtCode.toString()) || null;
   }
 
   // Get sub-district by code
-  static async getSubDistrictByCode(subDistrictCode: number): Promise<MhSubDistrict | null> {
-    const { data, error } = await supabase
-      .from('mh_subdistricts')
-      .select('*')
-      .eq('subdistrict_code', subDistrictCode)
-      .single();
-
-    if (error && error.code !== 'PGRST116') throw error; // Ignore "not found" error
-    return data;
+  static async getSubDistrictByCode(subDistrictCode: number | string): Promise<MhSubDistrict | null> {
+    const districts = await this.getDistrictsWithHierarchy();
+    for (const district of districts) {
+      const found = (district.mh_subdistricts || []).find(
+        (s) => s.subdistrict_code.toString() === subDistrictCode.toString()
+      );
+      if (found) return found;
+    }
+    return null;
   }
 
   // Legacy methods for backward compatibility
