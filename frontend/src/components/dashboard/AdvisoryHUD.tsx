@@ -1,4 +1,5 @@
 import { useDashboard } from "@/context/DashboardContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { AlertTriangle, CheckCircle, Info, ShieldAlert } from "lucide-react";
 
 const hudConfig = {
@@ -10,13 +11,14 @@ const hudConfig = {
 
 export function AdvisoryHUD() {
   const { predictionData, selectedRegion } = useDashboard();
+  const { t } = useLanguage();
 
   if (!selectedRegion || !predictionData) {
     return (
       <div className="glass rounded-xl px-5 py-3 flex items-center gap-3">
         <Info className="h-4 w-4 text-muted-foreground shrink-0" />
         <p className="text-sm text-muted-foreground">
-          Advisory updates will appear here after selecting a region.
+          {t("advisoryUpdatesAfterSelect")}
         </p>
       </div>
     );

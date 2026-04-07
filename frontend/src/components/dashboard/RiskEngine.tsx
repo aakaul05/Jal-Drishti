@@ -1,8 +1,9 @@
 import { useDashboard } from "@/context/DashboardContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingDown, TrendingUp, Gauge, Calendar, Waves } from "lucide-react";
 
-function R2Gauge({ value }: { value: number }) {
+function R2Gauge({ value, r2Label }: { value: number; r2Label: string }) {
   const percentage = value * 100;
   const circumference = 2 * Math.PI * 42;
   const strokeDashoffset = circumference - (percentage / 100) * circumference;
@@ -23,26 +24,27 @@ function R2Gauge({ value }: { value: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-xl font-bold font-mono text-foreground">{(value).toFixed(3)}</span>
-        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">R² Score</span>
+        <span className="text-[10px] text-muted-foreground uppercase tracking-wider">{r2Label}</span>
       </div>
     </div>
   );
 }
 
 const riskConfig = {
-  low: { color: "text-risk-low", bg: "bg-risk-low/10", border: "border-risk-low/30", label: "Low Risk" },
-  moderate: { color: "text-risk-moderate", bg: "bg-risk-moderate/10", border: "border-risk-moderate/30", label: "Moderate Risk" },
-  high: { color: "text-risk-high", bg: "bg-risk-high/10", border: "border-risk-high/30", label: "High Risk" },
-  severe: { color: "text-risk-severe", bg: "bg-risk-severe/10", border: "border-risk-severe/30", label: "Severe Risk" },
+  low: { color: "text-risk-low", bg: "bg-risk-low/10", border: "border-risk-low/30", labelKey: "riskLow" as const },
+  moderate: { color: "text-risk-moderate", bg: "bg-risk-moderate/10", border: "border-risk-moderate/30", labelKey: "riskModerate" as const },
+  high: { color: "text-risk-high", bg: "bg-risk-high/10", border: "border-risk-high/30", labelKey: "riskHigh" as const },
+  severe: { color: "text-risk-severe", bg: "bg-risk-severe/10", border: "border-risk-severe/30", labelKey: "riskSevere" as const },
 };
 
 export function RiskEngine() {
   const { predictionData, isLoading, selectedRegion } = useDashboard();
+  const { t } = useLanguage();
 
   if (!selectedRegion) {
     return (
       <div className="glass rounded-xl p-5 h-full flex items-center justify-center">
-        <p className="text-muted-foreground text-sm text-center">Select a region to view risk analysis</p>
+        <p className="text-muted-foreground text-sm text-center">{t("selectRegionRiskAnalysis")}</p>
       </div>
     );
   }
@@ -60,43 +62,44 @@ export function RiskEngine() {
   }
 
   const risk = riskConfig[predictionData.riskLevel];
+  const riskLabel = t(risk.labelKey);
   const rate = predictionData.annualChangeRate;
   const isDecline = rate > 0;
 
   return (
     <div className="glass rounded-xl p-5 h-full flex flex-col gap-4 overflow-y-auto">
-      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">Risk Engine</h3>
+      <h3 className="text-sm font-semibold text-foreground uppercase tracking-wider">{t("riskEngine")}</h3>
 
       {/* Risk Badge */}
       <div className={`rounded-lg p-3 border ${risk.bg} ${risk.border} text-center`}>
         <span className={`text-sm font-bold uppercase tracking-wider ${risk.color}`}>
-          {risk.label}
+          {riskLabel}
         </span>
       </div>
 
       {/* R² Gauge */}
-      <R2Gauge value={predictionData.rSquared} />
+      <R2Gauge value={predictionData.rSquared} r2Label={t("r2Score")} />
 
       {/* Stats */}
       <div className="space-y-2">
         <StatCard
           icon={<Waves className="h-4 w-4 text-cyan-glow" />}
-          label="Current Depth"
+          label={t("currentDepth")}
           value={`${predictionData.currentDepth.toFixed(1)} ft`}
         />
         <StatCard
           icon={isDecline ? <TrendingDown className="h-4 w-4 text-risk-severe" /> : <TrendingUp className="h-4 w-4 text-risk-low" />}
-          label="Annual Change"
+          label={t("annualChange")}
           value={`${isDecline ? "−" : "+"}${Math.abs(rate).toFixed(2)} ft/yr`}
         />
         <StatCard
           icon={<Calendar className="h-4 w-4 text-neon-green" />}
-          label="Prediction Horizon"
-          value="8 Years"
+          label={t("predictionHorizon")}
+          value={t("eightYears")}
         />
         <StatCard
           icon={<Gauge className="h-4 w-4 text-primary" />}
-          label="Model Accuracy"
+          label={t("modelAccuracy")}
           value={`${(predictionData.rSquared * 100).toFixed(1)}%`}
         />
       </div>

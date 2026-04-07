@@ -5,11 +5,14 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useDashboard } from '@/context/DashboardContext';
+import { useLanguage } from '@/context/LanguageContext';
+import { monthSelectOptions } from '@/i18n/helpers';
 import { RegionalDataService } from '@/services/regionalDataService';
 import type { MhDistrict, MhSubDistrict, MhVillage, MhDistrictWithSubDistricts } from '@/services/regionalDataService';
 
 export function RegionSidebarWithChart() {
   const { setSelectedRegion, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear } = useDashboard();
+  const { t } = useLanguage();
   
   // State for dropdown selections
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
@@ -99,20 +102,7 @@ export function RegionSidebarWithChart() {
 
   // Month/Year data
   const currentYear = new Date().getFullYear();
-  const months = [
-    { value: 1, label: 'January' },
-    { value: 2, label: 'February' },
-    { value: 3, label: 'March' },
-    { value: 4, label: 'April' },
-    { value: 5, label: 'May' },
-    { value: 6, label: 'June' },
-    { value: 7, label: 'July' },
-    { value: 8, label: 'August' },
-    { value: 9, label: 'September' },
-    { value: 10, label: 'October' },
-    { value: 11, label: 'November' },
-    { value: 12, label: 'December' }
-  ];
+  const months = monthSelectOptions(t);
   const years = Array.from({ length: 2 }, (_, i) => currentYear + i);
 
   return (
@@ -121,18 +111,18 @@ export function RegionSidebarWithChart() {
       <div className="glass rounded-xl p-4 flex-1 overflow-hidden flex flex-col">
         <div className="flex items-center gap-2 mb-3">
           <MapPin className="h-4 w-4 text-cyan-glow" />
-          <h3 className="text-sm font-semibold text-foreground">Regional Selection</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("regionalSelection")}</h3>
         </div>
         
         <div className="space-y-2">
           {/* District Dropdown */}
           <div>
             <Label htmlFor="district-select" className="text-xs text-muted-foreground mb-1 block">
-              District
+              {t("district")}
             </Label>
             <Select value={selectedDistrict} onValueChange={setSelectedDistrict} disabled={isLoading}>
               <SelectTrigger id="district-select" className="bg-secondary/50 border-border/50 text-sm">
-                <SelectValue placeholder="Select district" />
+                <SelectValue placeholder={t("selectDistrict")} />
               </SelectTrigger>
               <SelectContent>
                 {districts.map((district) => (
@@ -147,11 +137,11 @@ export function RegionSidebarWithChart() {
           {/* Sub-district Dropdown */}
           <div>
             <Label htmlFor="subdistrict-select" className="text-xs text-muted-foreground mb-1 block">
-              Sub-district
+              {t("subDistrict")}
             </Label>
             <Select value={selectedSubDistrict} onValueChange={setSelectedSubDistrict} disabled={!selectedDistrict}>
               <SelectTrigger id="subdistrict-select" className="bg-secondary/50 border-border/50 text-sm">
-                <SelectValue placeholder="Select sub-district" />
+                <SelectValue placeholder={t("selectSubDistrict")} />
               </SelectTrigger>
               <SelectContent>
                 {subDistricts.map((sub) => (
@@ -166,11 +156,11 @@ export function RegionSidebarWithChart() {
           {/* Village Dropdown */}
           <div>
             <Label htmlFor="village-select" className="text-xs text-muted-foreground mb-1 block">
-              Village
+              {t("village")}
             </Label>
             <Select value={selectedVillage} onValueChange={handleVillageChange} disabled={!selectedSubDistrict}>
               <SelectTrigger id="village-select" className="bg-secondary/50 border-border/50 text-sm">
-                <SelectValue placeholder="Select village" />
+                <SelectValue placeholder={t("selectVillage")} />
               </SelectTrigger>
               <SelectContent>
                 {villages.map((village) => (
@@ -188,18 +178,18 @@ export function RegionSidebarWithChart() {
       <div className="glass rounded-xl p-4">
         <div className="flex items-center gap-2 mb-3">
           <Calendar className="h-4 w-4 text-cyan-glow" />
-          <h3 className="text-sm font-semibold text-foreground">Time Period</h3>
+          <h3 className="text-sm font-semibold text-foreground">{t("timePeriod")}</h3>
         </div>
         
         <div className="grid grid-cols-2 gap-3">
           {/* Month Selector */}
           <div>
             <Label htmlFor="month-select" className="text-xs text-muted-foreground mb-1 block">
-              Month
+              {t("month")}
             </Label>
             <Select value={selectedMonth?.toString() || ""} onValueChange={(value) => setSelectedMonth(value ? parseInt(value) : null)}>
               <SelectTrigger id="month-select" className="bg-secondary/50 border-border/50 text-sm">
-                <SelectValue placeholder="Select month" />
+                <SelectValue placeholder={t("selectMonth")} />
               </SelectTrigger>
               <SelectContent>
                 {months.map((month) => (
@@ -214,16 +204,16 @@ export function RegionSidebarWithChart() {
           {/* Year Selector */}
           <div>
             <Label htmlFor="year-select" className="text-xs text-muted-foreground mb-1 block">
-              Year
+              {t("year")}
             </Label>
             <Select value={selectedYear?.toString() || ""} onValueChange={(value) => setSelectedYear(value ? parseInt(value) : null)}>
               <SelectTrigger id="year-select" className="bg-secondary/50 border-border/50 text-sm">
-                <SelectValue placeholder="Select year" />
+                <SelectValue placeholder={t("selectYear")} />
               </SelectTrigger>
               <SelectContent>
                 {years.map((year) => (
                   <SelectItem key={year} value={year.toString()}>
-                    {year} {year === currentYear ? '(Current)' : '(Prediction)'}
+                    {year} {year === currentYear ? t("yearCurrent") : t("yearPrediction")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -237,7 +227,7 @@ export function RegionSidebarWithChart() {
             <p className="text-xs text-muted-foreground text-center">
               {months.find(m => m.value === selectedMonth)?.label} {selectedYear}
               {selectedYear > currentYear && (
-                <span className="ml-1 text-neon-green font-medium">• Predicted</span>
+                <span className="ml-1 text-neon-green font-medium">• {t("summaryPredicted")}</span>
               )}
             </p>
           </div>

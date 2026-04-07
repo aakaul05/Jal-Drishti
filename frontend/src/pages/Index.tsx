@@ -8,6 +8,7 @@ import { MaharashtraMap } from "@/components/dashboard/MaharashtraMap";
 import { MonthlyInsightCard } from "@/components/dashboard/MonthlyInsightCard";
 import { MultilingualSupport } from "@/components/dashboard/MultilingualSupport";
 import { FarmerAnalysis } from "@/components/dashboard/FarmerAnalysis";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 const Index = () => {
   return (
@@ -15,6 +16,7 @@ const Index = () => {
       <div className="h-screen w-screen overflow-hidden bg-background p-3 grid grid-cols-[280px_1fr_280px] grid-rows-[1fr_auto] gap-3">
         {/* Left Sidebar - Regional Selection + Time Period */}
         <div className="row-span-2 min-h-0 overflow-hidden flex flex-col gap-3">
+          <LanguageSwitcher />
           <RegionSidebarWithChart />
           <MultilingualSupport />
           <FarmerAnalysis />
