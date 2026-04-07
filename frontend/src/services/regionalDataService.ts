@@ -58,7 +58,17 @@ export class RegionalDataService {
 
   // Fetch villages for a specific sub-district
   static async getVillages(subDistrictCode: number | string): Promise<MhVillage[]> {
-    return this.get<MhVillage[]>(`/api/locations/villages/${subDistrictCode}`);
+    // Use direct endpoint to get all villages without caching issues
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/direct-villages/${subDistrictCode}?limit=1000`);
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      }
+      return response.json() as Promise<MhVillage[]>;
+    } catch (error) {
+      console.error('Direct village query failed, falling back to cached endpoint:', error);
+      return this.get<MhVillage[]>(`/api/locations/villages/${subDistrictCode}`);
+    }
   }
 
   // Search villages by name across already loaded district hierarchy
