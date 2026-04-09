@@ -1,3 +1,5 @@
+import { supabase } from '@/lib/supabase';
+
 export interface MhDistrict {
   district_code: number | string;
   district_name: string;
@@ -26,49 +28,77 @@ export interface MhDistrictWithSubDistricts extends MhDistrict {
   mh_subdistricts: MhSubDistrict[];
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
-
 export class RegionalDataService {
-  private static async get<T>(path: string): Promise<T> {
-    const response = await fetch(`${API_BASE_URL}${path}`);
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-    }
-    return response.json() as Promise<T>;
-  }
-
-  // Fetch all districts from backend
+  // Fetch all unique districts from groundwater_cleaned_final
   static async getDistricts(): Promise<MhDistrict[]> {
-    const data = await this.get<MhDistrictWithSubDistricts[]>('/api/locations/districts');
-    return data.map((d) => ({
-      district_code: d.district_code,
-      district_name: d.district_name,
+    const { data, error } = await supabase
+      .from('groundwater_cleaned_final')
+      .select('district')
+      .order('district');
+    
+    if (error) throw error;
+    
+    // Get unique districts
+    const uniqueDistricts = [...new Set(data?.map(d => d.district) || [])];
+    return uniqueDistricts.map((d, i) => ({
+      district_code: i + 1,
+      district_name: d,
     }));
   }
 
-  // Fetch districts with their sub-districts (hierarchical)
+  // Fetch districts with their blocks
   static async getDistrictsWithHierarchy(): Promise<MhDistrictWithSubDistricts[]> {
-    return this.get<MhDistrictWithSubDistricts[]>('/api/locations/districts');
-  }
-
-  // Fetch sub-districts for a specific district
-  static async getSubDistricts(districtCode: number | string): Promise<MhSubDistrict[]> {
-    return this.get<MhSubDistrict[]>(`/api/locations/subdistricts/${districtCode}`);
-  }
-
-  // Fetch villages for a specific sub-district
-  static async getVillages(subDistrictCode: number | string): Promise<MhVillage[]> {
-    // Use direct endpoint to get all villages without caching issues
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/direct-villages/${subDistrictCode}?limit=1000`);
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
-      }
-      return response.json() as Promise<MhVillage[]>;
-    } catch (error) {
-      console.error('Direct village query failed, falling back to cached endpoint:', error);
-      return this.get<MhVillage[]>(`/api/locations/villages/${subDistrictCode}`);
+    const districts = await this.getDistricts();
+    const result: MhDistrictWithSubDistricts[] = [];
+    
+    for (const district of districts) {
+      const blocks = await this.getSubDistricts(district.district_name);
+      result.push({
+        district_code: district.district_code,
+        district_name: district.district_name,
+        mh_subdistricts: blocks,
+      });
     }
+    return result;
+  }
+
+  // Fetch unique blocks for a district
+  static async getSubDistricts(districtName: string): Promise<MhSubDistrict[]> {
+    const { data, error } = await supabase
+      .from('groundwater_cleaned_final')
+      .select('block')
+      .eq('district', districtName)
+      .order('block');
+    
+    if (error) throw error;
+    
+    // Get unique blocks
+    const uniqueBlocks = [...new Set(data?.map(d => d.block) || [])];
+    return uniqueBlocks.map((b, i) => ({
+      subdistrict_code: i + 1,
+      subdistrict_name: b,
+      district_code: districtName,
+      district_name: districtName,
+    }));
+  }
+
+  // Fetch villages for a district and block
+  static async getVillages(districtName: string, blockName: string): Promise<MhVillage[]> {
+    const { data, error } = await supabase
+      .from('groundwater_cleaned_final')
+      .select('id, village')
+      .eq('district', districtName)
+      .eq('block', blockName)
+      .order('village');
+    
+    if (error) throw error;
+    
+    return (data || []).map((v, i) => ({
+      village_code: v.id,
+      village_name: v.village,
+      subdistrict_code: blockName,
+      district_code: districtName,
+    }));
   }
 
   // Search villages by name across already loaded district hierarchy
@@ -81,7 +111,7 @@ export class RegionalDataService {
 
     for (const district of districts) {
       for (const sub of district.mh_subdistricts || []) {
-        const villages = await this.getVillages(sub.subdistrict_code);
+        const villages = await this.getVillages(district.district_name, sub.subdistrict_name);
         for (const village of villages) {
           if (village.village_name.toLowerCase().includes(normalized)) {
             matches.push(village);
@@ -99,7 +129,7 @@ export class RegionalDataService {
     const districts = await this.getDistrictsWithHierarchy();
     for (const district of districts) {
       for (const sub of district.mh_subdistricts || []) {
-        const villages = await this.getVillages(sub.subdistrict_code);
+        const villages = await this.getVillages(district.district_name, sub.subdistrict_name);
         const found = villages.find((v) => v.village_code.toString() === villageCode.toString());
         if (found) return found;
       }
@@ -149,12 +179,7 @@ export class RegionalDataService {
         name: sub.subdistrict_name,
         code: sub.subdistrict_code.toString(),
         district_id: district.district_code.toString(),
-        villages: sub.mh_villages?.map(village => ({
-          id: village.village_code.toString(),
-          name: village.village_name,
-          code: village.village_code.toString(),
-          sub_district_id: sub.subdistrict_code.toString()
-        })) || []
+        villages: [] // Villages fetched separately via getVillages()
       })) || []
     }));
   }

@@ -65,6 +65,10 @@ export function RiskEngine() {
   const riskLabel = t(risk.labelKey);
   const rate = predictionData.annualChangeRate;
   const isDecline = rate > 0;
+  const rfMeta = predictionData.rfMeta;
+  const trainedAtLabel = rfMeta?.trainedAt
+    ? new Date(rfMeta.trainedAt).toLocaleString()
+    : "N/A";
 
   return (
     <div className="glass rounded-xl p-5 h-full flex flex-col gap-4 overflow-y-auto">
@@ -103,6 +107,27 @@ export function RiskEngine() {
           value={`${(predictionData.rSquared * 100).toFixed(1)}%`}
         />
       </div>
+
+      {/* Data quality / model provenance */}
+      {rfMeta && (
+        <div className="mt-1 rounded-lg border border-border/30 bg-secondary/20 p-3">
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground mb-2">
+            RF Data Quality
+          </p>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="text-muted-foreground">Model Run ID</div>
+            <div className="text-foreground font-mono">{rfMeta.modelRunId ?? "N/A"}</div>
+            <div className="text-muted-foreground">Training Samples</div>
+            <div className="text-foreground font-mono">{rfMeta.trainingSamples ?? "N/A"}</div>
+            <div className="text-muted-foreground">Year Range</div>
+            <div className="text-foreground font-mono">
+              {rfMeta.yearMin && rfMeta.yearMax ? `${rfMeta.yearMin}-${rfMeta.yearMax}` : "N/A"}
+            </div>
+            <div className="text-muted-foreground">Last Trained</div>
+            <div className="text-foreground font-mono">{trainedAtLabel}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

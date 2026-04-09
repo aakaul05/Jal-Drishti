@@ -26,7 +26,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
 
   const { data: predictionData = null, isLoading } = useQuery({
     queryKey: ["regionData", selectedRegion?.id],
-    queryFn: () => fetchRegionData(selectedRegion!.id),
+    queryFn: () => fetchRegionData(selectedRegion!),
     enabled: !!selectedRegion,
     staleTime: 5 * 60 * 1000,
   });

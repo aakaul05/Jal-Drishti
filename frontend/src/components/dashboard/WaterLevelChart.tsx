@@ -67,6 +67,34 @@ export function WaterLevelChart() {
   } = useDashboard();
   const { t, locale } = useLanguage();
 
+  const sourceMeta = useMemo(() => {
+    const annualSource = predictionData?.dataSource;
+    const monthlySource = monthlyData?.dataSource;
+
+    const labelFor = (src?: string) => {
+      if (src === "stored-rf") return "Stored RF";
+      if (src === "on-demand-rf") return "On-demand RF";
+      if (src === "fallback-api") return "Fallback API";
+      if (src === "fallback-mock") return "Fallback Mock";
+      return "Unknown";
+    };
+
+    const toneFor = (src?: string) => {
+      if (src === "stored-rf" || src === "on-demand-rf") {
+        return "border-emerald-500/40 text-emerald-300 bg-emerald-500/10";
+      }
+      return "border-amber-500/40 text-amber-300 bg-amber-500/10";
+    };
+
+    return {
+      annualLabel: labelFor(annualSource),
+      annualTone: toneFor(annualSource),
+      monthlyLabel: labelFor(monthlySource),
+      monthlyTone: toneFor(monthlySource),
+      showMonthly: !!(selectedMonth && selectedYear && monthlyData),
+    };
+  }, [predictionData, monthlyData, selectedMonth, selectedYear]);
+
   // Next-year (12 months) forecast from the backend ML model.
   const [nextYearMonthly, setNextYearMonthly] = useState<MonthlyPredictionResult[] | null>(null);
 
@@ -202,7 +230,15 @@ export function WaterLevelChart() {
           <h2 className="text-base font-semibold text-foreground">{t("groundwaterDepthAnalysis")}</h2>
           <p className="text-xs text-muted-foreground mt-0.5">{selectedRegion.name} • {selectedRegion.district}</p>
         </div>
-        <div className="flex gap-4 text-xs">
+        <div className="flex items-center gap-3 text-xs">
+          <div className={`px-2 py-1 rounded-full border ${sourceMeta.annualTone}`}>
+            Source: {sourceMeta.annualLabel}
+          </div>
+          {sourceMeta.showMonthly && (
+            <div className={`px-2 py-1 rounded-full border ${sourceMeta.monthlyTone}`}>
+              Monthly: {sourceMeta.monthlyLabel}
+            </div>
+          )}
           <span className="flex items-center gap-1.5">
             <span className="w-4 h-0.5 bg-cyan-glow rounded-full inline-block" />
             {t("legendHistoricalYearly")}

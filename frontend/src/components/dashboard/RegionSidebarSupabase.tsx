@@ -133,10 +133,9 @@ export function RegionSidebarSupabase() {
   // Load villages from Supabase
   const loadVillages = async () => {
     try {
-      const subDistrict = subDistricts.find(sd => sd.subdistrict_name === selectedSubDistrict);
-      if (subDistrict) {
-        console.log('🏘️ Loading villages for sub-district:', subDistrict.subdistrict_name);
-        const villageData = await RegionalDataService.getVillages(subDistrict.subdistrict_code);
+      if (selectedDistrict && selectedSubDistrict) {
+        console.log('🏘️ Loading villages for:', selectedDistrict, selectedSubDistrict);
+        const villageData = await RegionalDataService.getVillages(selectedDistrict, selectedSubDistrict);
         console.log(`✅ Got ${villageData?.length || 0} villages`);
         setVillages(villageData);
       }

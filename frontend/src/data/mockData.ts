@@ -41,13 +41,36 @@ export interface PredictionResult {
   currentDepth: number;
   riskLevel: "low" | "moderate" | "high" | "severe";
   advisory: string;
+  dataSource?: "stored-rf" | "on-demand-rf" | "fallback-api" | "fallback-mock";
+  rfMeta?: {
+    modelRunId?: number;
+    trainingSamples?: number;
+    yearMin?: number;
+    yearMax?: number;
+    trainedAt?: string;
+  };
 }
 
 export interface MonthlyPredictionResult {
   exact_depth: number;
   monthly_change_rate: number;
   pointwise_insights: string[];
+  dataSource?: "stored-rf" | "fallback-mock";
 }
+
+type RFStoredPrediction = {
+  year: number;
+  month: number;
+  predicted_depth_meters: number;
+  confidence_low?: number;
+  confidence_high?: number;
+};
+
+type RFHistoricalPoint = {
+  year: number;
+  month: number;
+  depth_meters: number;
+};
 
 // Maharashtra hierarchical data
 export const maharashtraDistricts: District[] = [
@@ -235,36 +258,199 @@ function hashId(id: string): number {
   return Math.abs(hash);
 }
 
-const dataCache = new Map<string, PredictionResult>();
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-export async function fetchRegionData(regionId: string): Promise<PredictionResult> {
-  if (dataCache.has(regionId)) {
-    return dataCache.get(regionId)!;
+function riskFromAnnualChange(rate: number): PredictionResult["riskLevel"] {
+  const absRate = Math.abs(rate);
+  if (absRate < 0.3) return "low";
+  if (absRate < 0.7) return "moderate";
+  if (absRate < 1.2) return "high";
+  return "severe";
+}
+
+function advisoryFromAnnualChange(rate: number): string {
+  const absRate = Math.abs(rate);
+  if (absRate < 0.3) {
+    return `Stable conditions: Annual change of ${rate.toFixed(2)} ft/year within safe limits.`;
+  }
+  if (absRate < 0.7) {
+    return `Moderate Risk: Annual decline of ${absRate.toFixed(2)} ft/year. Monitor extraction rates.`;
+  }
+  if (absRate < 1.2) {
+    return `High Risk: Annual decline of ${absRate.toFixed(1)} ft/year. Immediate intervention recommended.`;
+  }
+  return `Severe Risk: Annual decline of ${absRate.toFixed(1)} ft/year detected. Critical depletion imminent.`;
+}
+
+function buildPredictionFromRF(
+  region: Region,
+  historicalRows: RFHistoricalPoint[],
+  predictionRows: RFStoredPrediction[],
+  r2FromModelRun?: number
+): PredictionResult | null {
+  const sortedHistoricalRows = (historicalRows || [])
+    .slice()
+    .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+  const sortedPredictionRows = (predictionRows || [])
+    .slice()
+    .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+
+  if (!sortedHistoricalRows.length || !sortedPredictionRows.length) return null;
+
+  const yearlyHistoricalMap = new Map<number, number>();
+  for (const row of sortedHistoricalRows) {
+    yearlyHistoricalMap.set(row.year, Number(row.depth_meters));
+  }
+  const historicalData = Array.from(yearlyHistoricalMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, depth]) => ({ year, depth: Math.round(depth * 100) / 100 }));
+
+  const yearlyPredMap = new Map<number, { sum: number; count: number; min?: number; max?: number }>();
+  for (const row of sortedPredictionRows) {
+    const y = row.year;
+    const prev = yearlyPredMap.get(y) || { sum: 0, count: 0, min: undefined, max: undefined };
+    prev.sum += Number(row.predicted_depth_meters);
+    prev.count += 1;
+    if (row.confidence_low != null) {
+      prev.min = prev.min == null ? Number(row.confidence_low) : Math.min(prev.min, Number(row.confidence_low));
+    }
+    if (row.confidence_high != null) {
+      prev.max = prev.max == null ? Number(row.confidence_high) : Math.max(prev.max, Number(row.confidence_high));
+    }
+    yearlyPredMap.set(y, prev);
   }
 
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/predict/annual`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ region: regionId }),
+  const predictedData = Array.from(yearlyPredMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([year, agg]) => {
+      const avg = agg.sum / Math.max(1, agg.count);
+      return {
+        year,
+        depth: Math.round(avg * 100) / 100,
+        predicted: true,
+        lowerCI: agg.min == null ? undefined : Math.round(agg.min * 100) / 100,
+        upperCI: agg.max == null ? undefined : Math.round(agg.max * 100) / 100,
+      };
     });
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
+
+  const currentDepth = historicalData[historicalData.length - 1]?.depth ?? 0;
+  const futureDepth = predictedData[0]?.depth ?? currentDepth;
+  const annualChangeRate = futureDepth - currentDepth;
+  const riskLevel = riskFromAnnualChange(annualChangeRate);
+  const r2 = Number(r2FromModelRun ?? 0.7);
+
+  return {
+    region,
+    historicalData,
+    predictedData,
+    rSquared: Math.max(0, Math.min(1, r2)),
+    annualChangeRate,
+    currentDepth,
+    riskLevel,
+    advisory: advisoryFromAnnualChange(annualChangeRate),
+  };
+}
+
+export async function fetchRegionData(region: Region): Promise<PredictionResult> {
+  const regionId = region.id;
+  try {
+    const readStoredPredictions = async (): Promise<RFStoredPrediction[]> => {
+      const response = await fetch(`${API_BASE_URL}/api/rf/predictions/${regionId}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = (await response.json()) as { predictions?: RFStoredPrediction[] };
+      return payload.predictions || [];
+    };
+
+    let storedPredictions = await readStoredPredictions();
+    let usedOnDemandRF = false;
+
+    // On-demand fallback for this village only when table has no rows.
+    if (!storedPredictions.length) {
+      const runResponse = await fetch(`${API_BASE_URL}/api/rf/pipeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ village_code: regionId }),
+      });
+      if (runResponse.ok) {
+        usedOnDemandRF = true;
+        storedPredictions = await readStoredPredictions();
+      }
     }
-    const result = (await response.json()) as PredictionResult;
-    dataCache.set(regionId, result);
-    return result;
+
+    if (!storedPredictions.length) {
+      throw new Error("No stored RF predictions available");
+    }
+
+    const trainingResponse = await fetch(`${API_BASE_URL}/api/rf/training-data/${regionId}`);
+    if (!trainingResponse.ok) {
+      throw new Error(`HTTP ${trainingResponse.status}`);
+    }
+    const trainingPayload = (await trainingResponse.json()) as { data?: RFHistoricalPoint[] };
+    const historicalRows = trainingPayload.data || [];
+
+    let r2FromModelRun: number | undefined;
+    let modelRunId: number | undefined;
+    let trainedAt: string | undefined;
+    let trainingSamplesFromRun: number | undefined;
+    let yearMin: number | undefined;
+    let yearMax: number | undefined;
+    const modelResponse = await fetch(`${API_BASE_URL}/api/rf/model-info/${regionId}`);
+    if (modelResponse.ok) {
+      const modelPayload = (await modelResponse.json()) as {
+        id?: number;
+        r_squared_cv?: number;
+        r_squared_train?: number;
+        trained_at?: string;
+        training_samples?: number;
+        training_year_min?: number;
+        training_year_max?: number;
+      };
+      r2FromModelRun = Number(modelPayload.r_squared_cv ?? modelPayload.r_squared_train ?? 0.7);
+      modelRunId = modelPayload.id;
+      trainedAt = modelPayload.trained_at;
+      trainingSamplesFromRun = modelPayload.training_samples;
+      yearMin = modelPayload.training_year_min;
+      yearMax = modelPayload.training_year_max;
+    }
+
+    const mapped = buildPredictionFromRF(region, historicalRows, storedPredictions, r2FromModelRun);
+    if (!mapped) {
+      throw new Error("RF data mapping failed");
+    }
+    mapped.dataSource = usedOnDemandRF ? "on-demand-rf" : "stored-rf";
+    mapped.rfMeta = {
+      modelRunId,
+      trainingSamples: trainingSamplesFromRun ?? historicalRows.length,
+      yearMin: yearMin ?? (historicalRows.length ? Math.min(...historicalRows.map((r) => r.year)) : undefined),
+      yearMax: yearMax ?? (historicalRows.length ? Math.max(...historicalRows.map((r) => r.year)) : undefined),
+      trainedAt,
+    };
+    return mapped;
   } catch {
+    // Final fallback: old annual endpoint (if available), else deterministic mock.
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/predict/annual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ region: regionId }),
+      });
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const result = (await response.json()) as PredictionResult;
+      result.region = region;
+      result.dataSource = "fallback-api";
+      return result;
+    } catch {
     const h = hashId(regionId);
     const baseDepth = 20 + (h % 60);
     const rate = ((h % 20) / 10) - 0.5; // -0.5 to 1.5
     const noise = 1 + (h % 4);
-    const region = regions.find((r) => r.id === regionId) || regions[0];
     const fallback = generateRegionData(baseDepth, rate, noise);
     fallback.region = region;
-    dataCache.set(regionId, fallback);
+    fallback.dataSource = "fallback-mock";
     return fallback;
+    }
   }
 }
 
@@ -280,15 +466,51 @@ export function searchRegions(query: string): Region[] {
 
 export async function fetchMonthlyData(regionId: string, year: number, month: number): Promise<MonthlyPredictionResult> {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/predict/monthly`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ region: regionId, year, month }),
-    });
+    // RF-first: read stored predictions for the village and interpolate if needed.
+    const response = await fetch(`${API_BASE_URL}/api/rf/predictions/${regionId}`);
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
     }
-    return (await response.json()) as MonthlyPredictionResult;
+    const payload = (await response.json()) as {
+      predictions?: { year: number; month: number; predicted_depth_meters: number }[];
+    };
+    const rows = (payload.predictions || []).filter((p) => p.year === year);
+    if (rows.length === 0) {
+      throw new Error("No RF predictions for selected year");
+    }
+
+    const exact = rows.find((p) => p.month === month);
+    const monthDepth = exact?.predicted_depth_meters;
+
+    // Linear interpolation using nearest known anchor months (1,5,8,11).
+    const sorted = rows.slice().sort((a, b) => a.month - b.month);
+    const valueAt = (m: number): number => {
+      const direct = sorted.find((r) => r.month === m);
+      if (direct) return Number(direct.predicted_depth_meters);
+      const prev = sorted.filter((r) => r.month < m).pop();
+      const next = sorted.find((r) => r.month > m);
+      if (prev && next) {
+        const ratio = (m - prev.month) / (next.month - prev.month);
+        return Number(prev.predicted_depth_meters) + ratio * (Number(next.predicted_depth_meters) - Number(prev.predicted_depth_meters));
+      }
+      if (prev) return Number(prev.predicted_depth_meters);
+      if (next) return Number(next.predicted_depth_meters);
+      return 0;
+    };
+
+    const exactDepth = monthDepth == null ? valueAt(month) : Number(monthDepth);
+    const prevMonth = month === 1 ? 12 : month - 1;
+    const prevDepth = valueAt(prevMonth);
+    const monthlyChange = exactDepth - prevDepth;
+
+    return {
+      exact_depth: Math.round(exactDepth * 100) / 100,
+      monthly_change_rate: Math.round(monthlyChange * 1000) / 1000,
+      pointwise_insights: [
+        `RF estimate for ${month}/${year} from stored model outputs`,
+      ],
+      dataSource: "stored-rf",
+    };
   } catch {
     // Deterministic fallback if backend is unavailable
     const h = hashId(regionId + year.toString() + month.toString());
@@ -303,6 +525,7 @@ export async function fetchMonthlyData(regionId: string, year: number, month: nu
       exact_depth: Math.round(exactDepth * 100) / 100,
       monthly_change_rate: Math.round(monthlyChangeRate * 1000) / 1000,
       pointwise_insights: [`Expected Depth: ${exactDepth.toFixed(2)} ft`],
+      dataSource: "fallback-mock",
     };
   }
 }
