@@ -81,26 +81,23 @@ export function RegionSidebarSupabase() {
   const [isLoading, setIsLoading] = useState(false);
   const [useFallback, setUseFallback] = useState(false);
 
-  // Load initial data
+  // Load initial data — only districts (NOT the full hierarchy)
   useEffect(() => {
     loadDistricts();
   }, []);
 
-  // Load districts with fallback
+  // Load districts only (lazy: blocks loaded on selection)
   const loadDistricts = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Loading districts from Supabase...');
-      const data = await RegionalDataService.getDistrictsWithHierarchy();
-      console.log(`✅ Service returned ${data?.length || 0} districts`);
-      console.log('📋 Raw data sample:', data?.slice(0, 2));
-      
-      setDistricts(data);
-      console.log('🔄 State updated, districts length:', data?.length);
+      console.log('🔍 Loading districts from backend...');
+      const data = await RegionalDataService.getDistricts();
+      console.log(`✅ Got ${data?.length || 0} districts`);
+      // Wrap each district into the WithSubDistricts shape (blocks loaded lazily)
+      setDistricts(data.map(d => ({ ...d, mh_subdistricts: [] })));
       setUseFallback(false);
-      console.log('🎉 Using real Supabase data!');
     } catch (error) {
-      console.error('❌ Service error:', error.message);
+      console.error('❌ Failed to load districts:', error);
       console.log('🔄 Falling back to demo data...');
       setUseFallback(true);
     } finally {
@@ -108,18 +105,27 @@ export function RegionSidebarSupabase() {
     }
   };
 
-  // Load sub-districts when district changes
+  // Load sub-districts lazily when district changes
   useEffect(() => {
     if (selectedDistrict) {
-      const district = districts.find(d => d.district_name === selectedDistrict);
-      if (district) {
-        setSubDistricts(district.mh_subdistricts || []);
-      }
+      loadSubDistricts(selectedDistrict);
     } else {
       setSubDistricts([]);
     }
     setVillages([]);
-  }, [selectedDistrict, districts]);
+  }, [selectedDistrict]);
+
+  const loadSubDistricts = async (districtName: string) => {
+    try {
+      console.log('🏘️ Loading blocks for:', districtName);
+      const blocks = await RegionalDataService.getSubDistricts(districtName);
+      console.log(`✅ Got ${blocks?.length || 0} blocks`);
+      setSubDistricts(blocks);
+    } catch (error) {
+      console.error('❌ Error loading blocks:', error);
+      setSubDistricts([]);
+    }
+  };
 
   // Load villages when sub-district changes
   useEffect(() => {

@@ -24,21 +24,25 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
 
+  // Use both id (for history endpoint) and name (for predictions/risk endpoints)
+  // as part of the query key for proper cache invalidation.
   const { data: predictionData = null, isLoading } = useQuery({
-    queryKey: ["regionData", selectedRegion?.id],
+    queryKey: ["regionData", selectedRegion?.id, selectedRegion?.name],
     queryFn: () => fetchRegionData(selectedRegion!),
     enabled: !!selectedRegion,
     staleTime: 5 * 60 * 1000,
   });
 
+  // fetchMonthlyData now takes villageName (not regionId) to match the backend API.
   const { data: monthlyData = null, isLoading: isLoadingMonthly } = useQuery({
-    queryKey: ["monthlyData", selectedRegion?.id, selectedYear, selectedMonth],
-    queryFn: () => fetchMonthlyData(selectedRegion!.id, selectedYear!, selectedMonth!),
+    queryKey: ["monthlyData", selectedRegion?.name, selectedYear, selectedMonth],
+    queryFn: () => fetchMonthlyData(selectedRegion!.name, selectedYear!, selectedMonth!),
     enabled: !!(selectedRegion && selectedYear && selectedMonth),
     staleTime: 2 * 60 * 1000,
   });
 
   const setSelectedRegion = useCallback((region: Region) => {
+    console.log('setSelectedRegion called with:', region);
     setSelectedRegionState(region);
     setSessionHistory((prev) => {
       const filtered = prev.filter((r) => r.id !== region.id);

@@ -11,8 +11,10 @@ import { RegionalDataService } from '@/services/regionalDataService';
 import type { MhDistrict, MhSubDistrict, MhVillage, MhDistrictWithSubDistricts } from '@/services/regionalDataService';
 
 export function RegionSidebarWithChart() {
+  console.log('RegionSidebarWithChart component mounting...');
   const { setSelectedRegion, selectedMonth, setSelectedMonth, selectedYear, setSelectedYear } = useDashboard();
   const { t } = useLanguage();
+  console.log('Dashboard hooks loaded, t function:', typeof t);
   
   // State for dropdown selections
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
@@ -27,18 +29,26 @@ export function RegionSidebarWithChart() {
 
   // Load districts on mount
   useEffect(() => {
+    console.log('useEffect triggered - calling loadDistricts...');
     loadDistricts();
   }, []);
 
   const loadDistricts = async () => {
     try {
       setIsLoading(true);
-      console.log('🔍 Loading districts from Supabase...');
+      console.log('Loading districts from Supabase...');
       const data = await RegionalDataService.getDistrictsWithHierarchy();
-      console.log(`✅ Service returned ${data?.length || 0} districts`);
+      console.log(`Service returned ${data?.length || 0} districts`);
+      if (data && data.length > 0) {
+        console.log('Sample districts:', data.slice(0, 3).map(d => d.district_name));
+      } else {
+        console.warn('No districts returned from service!');
+      }
       setDistricts(data);
     } catch (error) {
-      console.error('❌ Service error:', error.message);
+      console.error('Service error:', error.message);
+      console.error('Full error:', error);
+      console.error('Stack trace:', error.stack);
     } finally {
       setIsLoading(false);
     }
@@ -68,15 +78,22 @@ export function RegionSidebarWithChart() {
 
   const loadVillages = async () => {
     try {
-      const subDistrict = subDistricts.find(sd => sd.subdistrict_name === selectedSubDistrict);
-      if (subDistrict) {
-        console.log('🏘️ Loading villages for sub-district:', subDistrict.subdistrict_name);
-        const villageData = await RegionalDataService.getVillages(subDistrict.subdistrict_code);
-        console.log(`✅ Got ${villageData?.length || 0} villages`);
+      if (selectedDistrict && selectedSubDistrict) {
+        console.log('Loading villages for district:', selectedDistrict, 'sub-district:', selectedSubDistrict);
+        const villageData = await RegionalDataService.getVillages(selectedDistrict, selectedSubDistrict);
+        console.log(`Got ${villageData?.length || 0} villages`);
+        if (villageData && villageData.length > 0) {
+          console.log('Sample villages:', villageData.slice(0, 3).map(v => v.village_name));
+        } else {
+          console.warn('No villages returned for this block!');
+        }
         setVillages(villageData);
       }
     } catch (error) {
-      console.error('❌ Error loading villages:', error.message);
+      console.error('Error loading villages:', error.message);
+      console.error('Full error:', error);
+      console.error('Stack trace:', error.stack);
+      console.error('API call parameters:', { selectedDistrict, selectedSubDistrict });
       setVillages([]);
     }
   };

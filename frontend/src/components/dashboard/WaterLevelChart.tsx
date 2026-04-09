@@ -180,7 +180,7 @@ export function WaterLevelChart() {
       try {
         setNextYearMonthly(null);
         const results = await Promise.all(
-          Array.from({ length: 12 }, (_, i) => fetchMonthlyData(selectedRegion.id, nextYear, i + 1))
+          Array.from({ length: 12 }, (_, i) => fetchMonthlyData(selectedRegion.name, nextYear, i + 1))
         );
         if (cancelled) return;
         setNextYearMonthly(results);

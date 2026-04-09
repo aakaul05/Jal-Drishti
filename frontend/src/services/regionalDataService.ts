@@ -1,4 +1,6 @@
-import { supabase } from '@/lib/supabase';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+
+console.log('RegionalDataService module loaded. API_BASE_URL:', API_BASE_URL);
 
 export interface MhDistrict {
   district_code: number | string;
@@ -29,28 +31,25 @@ export interface MhDistrictWithSubDistricts extends MhDistrict {
 }
 
 export class RegionalDataService {
-  // Fetch all unique districts from groundwater_cleaned_final
+  // Fetch all unique districts from FastAPI backend
   static async getDistricts(): Promise<MhDistrict[]> {
-    const { data, error } = await supabase
-      .from('groundwater_cleaned_final')
-      .select('district')
-      .order('district');
-    
-    if (error) throw error;
-    
-    // Get unique districts
-    const uniqueDistricts = [...new Set(data?.map(d => d.district) || [])];
-    return uniqueDistricts.map((d, i) => ({
-      district_code: i + 1,
-      district_name: d,
-    }));
+    console.log('RegionalDataService.getDistricts() called...');
+    console.log(`Fetching districts from: ${API_BASE_URL}/api/cleaned/districts`);
+    const resp = await fetch(`${API_BASE_URL}/api/cleaned/districts`);
+    if (!resp.ok) {
+      console.error(`Districts API failed: ${resp.status} ${resp.statusText}`);
+      throw new Error(`Failed to fetch districts: ${resp.status}`);
+    }
+    const data: { district_code: number; district_name: string }[] = await resp.json();
+    console.log(`Districts API returned ${data.length} districts`);
+    return data;
   }
 
-  // Fetch districts with their blocks
+  // Fetch districts with their blocks (sub-districts)
   static async getDistrictsWithHierarchy(): Promise<MhDistrictWithSubDistricts[]> {
     const districts = await this.getDistricts();
     const result: MhDistrictWithSubDistricts[] = [];
-    
+
     for (const district of districts) {
       const blocks = await this.getSubDistricts(district.district_name);
       result.push({
@@ -62,66 +61,63 @@ export class RegionalDataService {
     return result;
   }
 
-  // Fetch unique blocks for a district
+  // Fetch unique blocks for a district from FastAPI backend
   static async getSubDistricts(districtName: string): Promise<MhSubDistrict[]> {
-    const { data, error } = await supabase
-      .from('groundwater_cleaned_final')
-      .select('block')
-      .eq('district', districtName)
-      .order('block');
-    
-    if (error) throw error;
-    
-    // Get unique blocks
-    const uniqueBlocks = [...new Set(data?.map(d => d.block) || [])];
-    return uniqueBlocks.map((b, i) => ({
-      subdistrict_code: i + 1,
-      subdistrict_name: b,
+    const resp = await fetch(`${API_BASE_URL}/api/cleaned/blocks/${encodeURIComponent(districtName)}`);
+    if (!resp.ok) throw new Error(`Failed to fetch blocks: ${resp.status}`);
+    const data: { subdistrict_code: number; subdistrict_name: string; district_name: string }[] = await resp.json();
+    return data.map((b) => ({
+      subdistrict_code: b.subdistrict_code,
+      subdistrict_name: b.subdistrict_name,
       district_code: districtName,
-      district_name: districtName,
+      district_name: b.district_name,
     }));
   }
 
-  // Fetch villages for a district and block
+  // Fetch villages for a district and block from FastAPI backend
   static async getVillages(districtName: string, blockName: string): Promise<MhVillage[]> {
-    const { data, error } = await supabase
-      .from('groundwater_cleaned_final')
-      .select('id, village')
-      .eq('district', districtName)
-      .eq('block', blockName)
-      .order('village');
-    
-    if (error) throw error;
-    
-    return (data || []).map((v, i) => ({
-      village_code: v.id,
-      village_name: v.village,
+    const url = `${API_BASE_URL}/api/cleaned/villages/${encodeURIComponent(districtName)}/${encodeURIComponent(blockName)}`;
+    console.log(`Fetching villages from: ${url}`);
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`Villages API failed: ${resp.status} ${resp.statusText}`);
+      console.error(`URL was: ${url}`);
+      throw new Error(`Failed to fetch villages: ${resp.status}`);
+    }
+    const data: { village_code: number; village_name: string; subdistrict_name: string; district_name: string }[] =
+      await resp.json();
+    console.log(`Villages API returned ${data.length} villages for ${districtName}/${blockName}`);
+    return data.map((v) => ({
+      village_code: v.village_code,
+      village_name: v.village_name,
       subdistrict_code: blockName,
       district_code: districtName,
     }));
   }
 
-  // Search villages by name across already loaded district hierarchy
+  // Search villages using the fast backend search endpoint (single API call)
   static async searchVillages(query: string): Promise<MhVillage[]> {
-    const normalized = query.trim().toLowerCase();
+    const normalized = query.trim();
     if (!normalized) return [];
 
-    const districts = await this.getDistrictsWithHierarchy();
-    const matches: MhVillage[] = [];
+    const resp = await fetch(
+      `${API_BASE_URL}/api/cleaned/search?q=${encodeURIComponent(normalized)}`
+    );
+    if (!resp.ok) return [];
 
-    for (const district of districts) {
-      for (const sub of district.mh_subdistricts || []) {
-        const villages = await this.getVillages(district.district_name, sub.subdistrict_name);
-        for (const village of villages) {
-          if (village.village_name.toLowerCase().includes(normalized)) {
-            matches.push(village);
-            if (matches.length >= 20) return matches;
-          }
-        }
-      }
-    }
+    const data: { village_code: number; village_name: string; district_name: string; block_name: string }[] =
+      await resp.json();
 
-    return matches;
+    return data.map((item) => ({
+      village_code: item.village_code,
+      village_name: item.village_name,
+      subdistrict_code: item.block_name,
+      district_code: item.district_name,
+      mh_subdistricts: {
+        subdistrict_name: item.block_name,
+        district_name: item.district_name,
+      },
+    }));
   }
 
   // Get village by ID with full hierarchy
