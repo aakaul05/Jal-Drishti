@@ -17,6 +17,11 @@ frontend/dist
 __pycache__/
 *.py[cod]
 *.local
+.venv/
+backend/.venv/
+*.pkl
+*.joblib
+backend/output/
 
 # Env files (do not commit secrets)
 .env
