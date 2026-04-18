@@ -104,7 +104,8 @@ export function RegionSidebarWithChart() {
   // Month/Year data
   const currentYear = new Date().getFullYear();
   const months = monthSelectOptions(t);
-  const years = Array.from({ length: 2 }, (_, i) => currentYear + i);
+  // const years = Array.from({ length: 2 }, (_, i) => currentYear + i);
+  const years = [2025];
 
   // Step indicator
   const step = !selectedDistrict ? 1 : !selectedSubDistrict ? 2 : !selectedVillage ? 3 : 4;
@@ -266,14 +267,10 @@ export function RegionSidebarWithChart() {
 
       {/* ─── Quick Info ─── */}
       <div className="glass rounded-xl p-4">
-        <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="p-2.5 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 rounded-lg border border-cyan-500/15">
-            <p className="text-lg font-bold text-cyan-400">{currentYear}</p>
+        <div className="grid grid-cols-2 gap-2 text-center place-items-center">
+          <div className="p-2.5 bg-gradient-to-br from-cyan-500/10 to-cyan-600/5 rounded-lg border border-cyan-500/15 flex flex-col items-center justify-center">
+            <p className="text-lg font-bold text-cyan-400">{2025}</p>
             <p className="text-[10px] text-muted-foreground">Current Year</p>
-          </div>
-          <div className="p-2.5 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-lg border border-emerald-500/15">
-            <p className="text-lg font-bold text-emerald-400">{currentYear + 1}</p>
-            <p className="text-[10px] text-muted-foreground">Prediction Year</p>
           </div>
         </div>
       </div>

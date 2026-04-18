@@ -9,6 +9,9 @@ frontend/dist/
 # ─── Python / Backend ────────────────────────────────
 .venv/
 backend/.venv/
+venv/
+env/
+.env/
 __pycache__/
 *.py[cod]
 *.pyo
