@@ -17,6 +17,12 @@ SUPABASE_URL = (os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or "
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY") or ""
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or ""
 
+# Debug: Print environment variables (remove in production)
+print(f"DEBUG: SUPABASE_URL loaded: {bool(SUPABASE_URL)}")
+print(f"DEBUG: SUPABASE_KEY loaded: {bool(SUPABASE_KEY)}")
+print(f"DEBUG: GEMINI_API_KEY loaded: {bool(GEMINI_API_KEY)}")
+print(f"DEBUG: GEMINI_API_KEY starts with AIza: {GEMINI_API_KEY.startswith('AIza') if GEMINI_API_KEY else False}")
+
 
 def _headers() -> dict[str, str]:
     return {
