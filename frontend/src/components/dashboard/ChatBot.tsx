@@ -15,7 +15,7 @@ interface ChatMessage {
 
 export function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       role: "assistant",
@@ -48,6 +48,7 @@ export function ChatBot() {
       const body: Record<string, unknown> = {
         message: userMsg,
         chat_history: messages.slice(-6), // last 6 messages for context
+        language: locale, // Send selected language to backend
       };
 
       if (selectedRegion) {

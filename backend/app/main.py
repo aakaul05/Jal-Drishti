@@ -684,6 +684,7 @@ from pydantic import BaseModel
 
 class ChatRequest(BaseModel):
     message: str
+    language: str = "en"  # en, hi, mr - language to respond in
     village_name: str | None = None
     district: str | None = None
     block: str | None = None
@@ -835,8 +836,16 @@ async def chat_with_ollama(req: ChatRequest):
 
     # Call Ollama API (free local AI)
     try:
+        # Determine response language
+        language_instructions = {
+            "en": "Respond in English",
+            "hi": "Respond in Hindi (Devanagari script)",
+            "mr": "Respond in Marathi (Devanagari script)"
+        }
+        response_language = language_instructions.get(req.language, "Respond in English")
+        
         # Build prompt for Ollama - context first, then question
-        prompt_text = f"{SYSTEM_PROMPT}\n\nVillage Context:\n{village_context}\n\nFarmer Question: {req.message}\n\nAssistant Response:"
+        prompt_text = f"{SYSTEM_PROMPT}\n\n{response_language}.\n\nVillage Context:\n{village_context}\n\nFarmer Question: {req.message}\n\nAssistant Response:"
         
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
