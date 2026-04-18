@@ -10,13 +10,9 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 
 import { LanguageProvider } from "@/context/LanguageContext";
 
-import { AuthProvider } from "@/context/AuthContext";
-
-import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-
 import Index from "./pages/Index.tsx";
 
-import { LoginPage } from "./pages/LoginPage";
+import { WelcomePage } from "./pages/WelcomePage";
 
 import NotFound from "./pages/NotFound.tsx";
 
@@ -30,8 +26,6 @@ const App = () => (
 
   <QueryClientProvider client={queryClient}>
 
-    <AuthProvider>
-
       <LanguageProvider>
 
         <TooltipProvider>
@@ -41,20 +35,14 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={
-                <ProtectedRoute>
-                  <Index />
-                </ProtectedRoute>
-              } />
+              <Route path="/" element={<WelcomePage />} />
+              <Route path="/dashboard" element={<Index />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
         </TooltipProvider>
       </LanguageProvider>
-
-    </AuthProvider>
 
   </QueryClientProvider>
 

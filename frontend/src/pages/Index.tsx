@@ -7,10 +7,8 @@ import { ChatBot } from "@/components/dashboard/ChatBot";
 import { MonthlyInsightCard } from "@/components/dashboard/MonthlyInsightCard";
 import { FarmerAnalysis } from "@/components/dashboard/FarmerAnalysis";
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
-import { useAuth } from "@/context/AuthContext";
-import { Button } from "@/components/ui/button";
 import {
-  LogOut, User, Droplets, TrendingUp, BarChart3,
+  Droplets, TrendingUp, BarChart3,
   Sprout, ChevronDown, ChevronUp, LayoutDashboard, LineChart, Wheat
 } from "lucide-react";
 import { useState } from "react";
@@ -201,13 +199,12 @@ function QuickStat({ label, value, sub, color }: { label: string; value: string;
 /* ───────────────────── Main Page ───────────────────── */
 
 const Index = () => {
-  const { username, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
 
   return (
     <DashboardProvider>
       <div className="h-screen w-screen flex flex-col overflow-hidden bg-background">
-        {/* ─── Header ─── */}
+        {/* Header */}
         <header className="shrink-0 border-b border-border/20 bg-background/95 backdrop-blur-sm z-50">
           <div className="px-5 h-14 flex items-center justify-between">
             {/* Brand */}
@@ -217,7 +214,7 @@ const Index = () => {
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent leading-tight">
-                  जल दृष्टि — Jal Drishti
+                  Jal Drishti
                 </h1>
                 <p className="text-[10px] text-muted-foreground">Groundwater Intelligence for Farmers</p>
               </div>
@@ -226,13 +223,6 @@ const Index = () => {
             {/* Right side */}
             <div className="flex items-center gap-2">
               <LanguageSwitcher />
-              <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary/30 border border-border/20">
-                <User className="h-3.5 w-3.5 text-cyan-400" />
-                <span className="text-xs font-medium">{username}</span>
-              </div>
-              <Button onClick={logout} variant="ghost" size="sm" className="h-8 px-2 text-xs text-muted-foreground hover:text-red-400">
-                <LogOut className="h-3.5 w-3.5" />
-              </Button>
             </div>
           </div>
         </header>
