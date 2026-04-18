@@ -1,5 +1,38 @@
-# Logs
-logs
+# ─── Node / Frontend ─────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+frontend/node_modules/
+frontend/dist/
+*.tsbuildinfo
+
+# ─── Python / Backend ────────────────────────────────
+.venv/
+backend/.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+*.whl
+
+# ─── Model & Data (large CSVs, trained models) ──────
+backend/model/*.csv
+backend/model/*.pkl
+backend/model/*.joblib
+backend/output/
+*.pkl
+*.joblib
+
+# ─── Environment / Secrets ───────────────────────────
+.env
+.env.*
+!.env.example
+frontend/.env
+frontend/.env.*
+
+# ─── Logs ────────────────────────────────────────────
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -7,33 +40,15 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-frontend/node_modules
-frontend/dist
-
-# Python
-__pycache__/
-*.py[cod]
-*.local
-.venv/
-backend/.venv/
-*.pkl
-*.joblib
-backend/output/
-
-# Env files (do not commit secrets)
-.env
-frontend/.env
-
-# Editor directories and files
+# ─── Editor / OS ─────────────────────────────────────
 .vscode/*
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
+Thumbs.db
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+*.local
