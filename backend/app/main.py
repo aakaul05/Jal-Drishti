@@ -15,10 +15,8 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 
 SUPABASE_URL = (os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL") or "").rstrip("/")
 SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY") or ""
-# Using local Ollama AI - no API key needed!
-OLLAMA_URL = "http://localhost:11434/api/chat"
+OLLAMA_URL = "http://localhost:11434/api/generate"
 
-# Debug: Print environment variables (remove in production)
 print(f"DEBUG: SUPABASE_URL loaded: {bool(SUPABASE_URL)}")
 print(f"DEBUG: SUPABASE_KEY loaded: {bool(SUPABASE_KEY)}")
 print(f"DEBUG: Using local Ollama AI (free!)")
@@ -43,7 +41,7 @@ app.add_middleware(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# IN-MEMORY CACHE (5 min TTL — avoids hitting Supabase every request)
+# IN-MEMORY CACHE (5 min TTL)
 # ═══════════════════════════════════════════════════════════════════════════
 
 _cache: dict[str, tuple[float, Any]] = {}
@@ -74,50 +72,36 @@ def health_check():
 def debug_district_count():
     """Debug endpoint to check total districts and records."""
     try:
-        # Get all districts in batches to avoid pagination limits
         all_districts = set()
         offset = 0
         batch_size = 1000
         total_fetched = 0
-        
+
         while True:
             resp = httpx.get(
                 f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
-                params={
-                    "select": "district", 
-                    "order": "district",
-                    "limit": str(batch_size),
-                    "offset": str(offset)
-                },
+                params={"select": "district", "order": "district", "limit": str(batch_size), "offset": str(offset)},
                 headers=_headers(),
                 timeout=30,
             )
             resp.raise_for_status()
             data = resp.json()
-            
             if not data:
                 break
-                
-            # Extract districts from this batch
             for item in data:
                 if item.get("district") and item["district"].strip():
                     all_districts.add(item["district"].strip())
-            
             total_fetched += len(data)
-            
-            # Check if we got all records
             if len(data) < batch_size:
                 break
-                
             offset += batch_size
-        
+
         return {
             "total_records_fetched": total_fetched,
             "total_unique_districts": len(all_districts),
             "all_districts_sorted": sorted(list(all_districts)),
-            "districts_a_to_z": sorted([d for d in all_districts if d and d[0].isalpha()]),
             "sample_first_20": sorted(list(all_districts))[:20],
-            "sample_last_20": sorted(list(all_districts))[-20:]
+            "sample_last_20": sorted(list(all_districts))[-20:],
         }
     except Exception as e:
         return {"error": str(e)}
@@ -129,65 +113,43 @@ def debug_district_count():
 
 @app.get("/api/cleaned/districts")
 def get_cleaned_districts():
-    """
-    Return main district names only.
-    Filters out combined "District Block" entries to return only actual districts.
-    Uses pagination to fetch all records.
-    """
     cached = _get_cached("districts")
     if cached is not None:
         return cached
 
-    # Get all districts in batches to avoid pagination limits
     all_names = set()
     offset = 0
     batch_size = 1000
-    
+
     while True:
         resp = httpx.get(
             f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
-            params={
-                "select": "district", 
-                "order": "district",
-                "limit": str(batch_size),
-                "offset": str(offset)
-            },
+            params={"select": "district", "order": "district", "limit": str(batch_size), "offset": str(offset)},
             headers=_headers(),
             timeout=30,
         )
         resp.raise_for_status()
         data = resp.json()
-        
         if not data:
             break
-            
-        # Add districts from this batch
         for item in data:
             if item.get("district") and item["district"].strip():
                 all_names.add(item["district"].strip())
-        
-        # Check if we got all records
         if len(data) < batch_size:
             break
-            
         offset += batch_size
-    
+
     all_names = sorted(all_names)
-    
-    # Extract only main districts (filter out combined "District Block" entries)
     main_districts = set()
     for name in all_names:
-        # If it's a single word or known main district, add it
         if ' ' not in name or name == 'Chhatrapati Sambhajinagar':
             main_districts.add(name)
         else:
-            # For combined entries, take only the first word (main district)
             first_word = name.split()[0]
             if first_word not in ['Bhadrawati', 'Brahmapuri', 'Chikhaldara', 'Gondpipri', 'Nagbhid', 'Sindewahi']:
                 main_districts.add(first_word)
-    
-    final_districts = sorted(main_districts)
 
+    final_districts = sorted(main_districts)
     result = [{"district_code": i + 1, "district_name": d} for i, d in enumerate(final_districts)]
     _set_cached("districts", result)
     return result
@@ -195,90 +157,61 @@ def get_cleaned_districts():
 
 @app.get("/api/cleaned/blocks/{district_name}")
 def get_cleaned_blocks(district_name: str):
-    """Fetch unique blocks for a district using pagination."""
     cache_key = f"blocks:{district_name}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
 
-    # Get all blocks for this district in batches
     all_blocks = set()
     offset = 0
     batch_size = 1000
-    
+
     while True:
         resp = httpx.get(
             f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
-            params={
-                "select": "block", 
-                "district": f"eq.{district_name}", 
-                "order": "block",
-                "limit": str(batch_size),
-                "offset": str(offset)
-            },
+            params={"select": "block", "district": f"eq.{district_name}", "order": "block", "limit": str(batch_size), "offset": str(offset)},
             headers=_headers(),
             timeout=30,
         )
         resp.raise_for_status()
         data = resp.json()
-        
         if not data:
             break
-            
-        # Add blocks from this batch
         for item in data:
             if item.get("block") and item["block"].strip():
                 all_blocks.add(item["block"].strip())
-        
-        # Check if we got all records
         if len(data) < batch_size:
             break
-            
         offset += batch_size
-    
+
     blocks = sorted(all_blocks)
-    result = [
-        {"subdistrict_code": i + 1, "subdistrict_name": b, "district_name": district_name}
-        for i, b in enumerate(blocks)
-    ]
+    result = [{"subdistrict_code": i + 1, "subdistrict_name": b, "district_name": district_name} for i, b in enumerate(blocks)]
     _set_cached(cache_key, result)
     return result
 
 
 @app.get("/api/cleaned/villages/{district_name}/{block_name}")
 def get_cleaned_villages(district_name: str, block_name: str):
-    """Fetch villages for a district + block using pagination."""
     cache_key = f"villages:{district_name}:{block_name}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
 
-    # Get all villages for this district+block in batches
     all_villages = []
     offset = 0
     batch_size = 1000
-    
+
     while True:
         resp = httpx.get(
             f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
-            params={
-                "select": "id,village",
-                "district": f"eq.{district_name}",
-                "block": f"eq.{block_name}",
-                "order": "village",
-                "limit": str(batch_size),
-                "offset": str(offset)
-            },
+            params={"select": "id,village", "district": f"eq.{district_name}", "block": f"eq.{block_name}", "order": "village", "limit": str(batch_size), "offset": str(offset)},
             headers=_headers(),
             timeout=30,
         )
         resp.raise_for_status()
         data = resp.json()
-        
         if not data:
             break
-            
-        # Add villages from this batch
         for item in data:
             if item.get("village") and item["village"].strip():
                 all_villages.append({
@@ -287,55 +220,37 @@ def get_cleaned_villages(district_name: str, block_name: str):
                     "subdistrict_name": block_name,
                     "district_name": district_name,
                 })
-        
-        # Check if we got all records
         if len(data) < batch_size:
             break
-            
         offset += batch_size
-    
+
     _set_cached(cache_key, all_villages)
     return all_villages
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# SEARCH — fast server-side village search (single query, no hierarchy)
-# ═══════════════════════════════════════════════════════════════════════════
-
 @app.get("/api/cleaned/search")
 def search_villages(q: str = Query(..., min_length=1)):
-    """Search villages by name (case-insensitive). Uses pagination for complete results."""
     cache_key = f"search:{q.lower()}"
     cached = _get_cached(cache_key)
     if cached is not None:
         return cached
 
-    # Search all villages matching the query in batches
     all_results = []
     offset = 0
     batch_size = 1000
-    max_results = 100  # Limit to 100 results to avoid too much data
-    
+    max_results = 100
+
     while len(all_results) < max_results:
         resp = httpx.get(
             f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
-            params={
-                "select": "id,village,district,block",
-                "village": f"ilike.*{q}*",
-                "order": "village",
-                "limit": str(min(batch_size, max_results - len(all_results))),
-                "offset": str(offset)
-            },
+            params={"select": "id,village,district,block", "village": f"ilike.*{q}*", "order": "village", "limit": str(min(batch_size, max_results - len(all_results))), "offset": str(offset)},
             headers=_headers(),
             timeout=15,
         )
         resp.raise_for_status()
         data = resp.json()
-        
         if not data:
             break
-            
-        # Add results from this batch
         for item in data:
             if item.get("village") and item["village"].strip():
                 all_results.append({
@@ -344,19 +259,16 @@ def search_villages(q: str = Query(..., min_length=1)):
                     "district_name": item.get("district", ""),
                     "block_name": item.get("block", ""),
                 })
-        
-        # Check if we got all records or reached max results
         if len(data) < batch_size or len(all_results) >= max_results:
             break
-            
         offset += batch_size
-    
+
     _set_cached(cache_key, all_results)
     return all_results
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# HISTORICAL DATA — 10-year yearly averages
+# HISTORICAL DATA
 # ═══════════════════════════════════════════════════════════════════════════
 
 HISTORY_YEARS = list(range(2014, 2024))
@@ -365,10 +277,6 @@ HISTORY_MONTHS = ["jan", "may", "aug", "nov"]
 
 @app.get("/api/cleaned/history/{village_id}")
 def get_village_history(village_id: int):
-    """
-    Returns 10 yearly avg depth points (2014-2023).
-    Each point = average of jan, may, aug, nov readings for that year.
-    """
     cache_key = f"history:{village_id}"
     cached = _get_cached(cache_key)
     if cached is not None:
@@ -382,7 +290,6 @@ def get_village_history(village_id: int):
     )
     resp.raise_for_status()
     data = resp.json()
-
     if not data:
         raise HTTPException(status_code=404, detail=f"Village {village_id} not found")
 
@@ -409,16 +316,11 @@ def get_village_history(village_id: int):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# PREDICTIONS — per-season from groundwater_predictions
-# Response shape per prediction row:
-#   { season: "Jan"|"May"|"Aug"|"Nov",
-#     predicted_2024: float, predicted_2025: float,
-#     actual_2024: float|null, risk_level: "SAFE"|"HIGH"|"MODERATE" }
+# PREDICTIONS
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/predictions/{village_name}")
 def get_predictions(village_name: str):
-    """Fetch season-level predictions (2024 + 2025) for a village."""
     cache_key = f"predictions:{village_name}"
     cached = _get_cached(cache_key)
     if cached is not None:
@@ -432,7 +334,6 @@ def get_predictions(village_name: str):
     )
     resp.raise_for_status()
     data = resp.json()
-
     if not data:
         raise HTTPException(status_code=404, detail=f"No predictions for '{village_name}'")
 
@@ -447,16 +348,11 @@ def get_predictions(village_name: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# VILLAGE RISK — aggregated from groundwater_village_risk
-# Response shape:
-#   { risk_level: "HIGH"|"SAFE"|"MODERATE",
-#     avg_actual_2024, avg_predicted_2024, avg_predicted_2025,
-#     avg_difference, avg_abs_difference }
+# VILLAGE RISK
 # ═══════════════════════════════════════════════════════════════════════════
 
 @app.get("/api/village-risk/{village_name}")
 def get_village_risk(village_name: str):
-    """Fetch aggregated village risk summary."""
     cache_key = f"risk:{village_name}"
     cached = _get_cached(cache_key)
     if cached is not None:
@@ -470,7 +366,6 @@ def get_village_risk(village_name: str):
     )
     resp.raise_for_status()
     data = resp.json()
-
     if not data:
         raise HTTPException(status_code=404, detail=f"No risk data for '{village_name}'")
 
@@ -480,7 +375,6 @@ def get_village_risk(village_name: str):
 
 @app.get("/api/village-risk")
 def get_all_village_risks(district: str = None, block: str = None):
-    """Fetch all village risks, optionally filtered."""
     params: dict[str, str] = {"select": "*", "model": "llama-2.5b", "order": "village"}
     if district:
         params["district"] = f"eq.{district}"
@@ -497,15 +391,12 @@ def get_all_village_risks(district: str = None, block: str = None):
     return resp.json()
 
 
-# Graph data API endpoint for plotting
+# ═══════════════════════════════════════════════════════════════════════════
+# GRAPH DATA
+# ═══════════════════════════════════════════════════════════════════════════
+
 @app.get("/api/graph-data/{village_name}")
 async def get_graph_data(village_name: str):
-    """
-    Comprehensive graph data endpoint combining historical data, predictions, and risk.
-    Returns data in format optimized for chart libraries (Chart.js, Recharts, etc.).
-
-    Optimised: uses in-memory cache + fires all 3 Supabase queries in parallel.
-    """
     cache_key = f"graph:{village_name}"
     cached = _get_cached(cache_key)
     if cached is not None:
@@ -515,7 +406,6 @@ async def get_graph_data(village_name: str):
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
-            # Fire all three Supabase queries concurrently
             history_task = client.get(
                 f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
                 params={"select": "*", "village": f"eq.{village_name}", "limit": "1"},
@@ -531,12 +421,8 @@ async def get_graph_data(village_name: str):
                 params={"select": "*", "village": f"eq.{village_name}", "limit": "1"},
                 headers=hdrs,
             )
+            history_resp, prediction_resp, risk_resp = await asyncio.gather(history_task, predictions_task, risk_task)
 
-            history_resp, prediction_resp, risk_resp = await asyncio.gather(
-                history_task, predictions_task, risk_task
-            )
-
-        # --- History (also provides village metadata) ---
         history_resp.raise_for_status()
         history_rows = history_resp.json()
         if not history_rows:
@@ -555,17 +441,10 @@ async def get_graph_data(village_name: str):
                 if val is not None:
                     depths.append(float(val))
             if depths:
-                historical_points.append({
-                    "year": year,
-                    "depth": round(sum(depths) / len(depths), 2),
-                    "type": "historical",
-                    "season": None,
-                })
+                historical_points.append({"year": year, "depth": round(sum(depths) / len(depths), 2), "type": "historical", "season": None})
 
-        # --- Predictions ---
         prediction_resp.raise_for_status()
         prediction_data = prediction_resp.json()
-
         prediction_points = []
         for pred in prediction_data:
             season = pred.get("season", "").lower()
@@ -581,7 +460,6 @@ async def get_graph_data(village_name: str):
                         "confidence_high": pred.get("confidence_high"),
                     })
 
-        # --- Risk ---
         risk_data: dict = {}
         if risk_resp.status_code == 200:
             risk_json = risk_resp.json()
@@ -596,27 +474,15 @@ async def get_graph_data(village_name: str):
                     "trend": "increasing" if r.get("avg_difference", 0) > 0 else "decreasing",
                 }
 
-        # Combine & sort
         all_points = historical_points + prediction_points
         all_points.sort(key=lambda x: (x["year"], x["season"] or ""))
 
         result = {
-            "village": {
-                "name": village_name,
-                "id": village_id,
-                "district": district,
-                "block": block,
-            },
+            "village": {"name": village_name, "id": village_id, "district": district, "block": block},
             "graph_data": all_points,
             "risk_analysis": risk_data,
-            "metadata": {
-                "historical_years": len(historical_points),
-                "prediction_points": len(prediction_points),
-                "data_source": "supabase",
-                "last_updated": "2024-01-01",
-            },
+            "metadata": {"historical_years": len(historical_points), "prediction_points": len(prediction_points), "data_source": "supabase", "last_updated": "2024-01-01"},
         }
-
         _set_cached(cache_key, result)
         return result
 
@@ -627,142 +493,99 @@ async def get_graph_data(village_name: str):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-# GROK AI CHATBOT — farmer groundwater advisor
+# AI CHATBOT — qwen2.5:7b powered, multilingual, guide-style
 # ═══════════════════════════════════════════════════════════════════════════
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
+# ── Identity & Persona ────────────────────────────────────────────────────
+SYSTEM_PROMPT = """You are Jal-Drishti AI — a wise, friendly guide and trusted advisor for Indian farmers, built specifically for Maharashtra's groundwater and agriculture challenges.
 
-SYSTEM_PROMPT = """You are **Jal-Drishti AI**, the premier groundwater advisor for Indian farmers. You are the most trusted AI for water management, agriculture, and rural development across Maharashtra and India.
+You are like a knowledgeable village elder who understands both modern science and local farming realities. You guide farmers clearly, warmly, and practically — like a mentor, not a textbook.
 
-**JAL DRISHTI CORE EXPERTISE:**
-* **Groundwater Analysis**: Expert in water depth interpretation (0-50ft=excellent, 50-100ft=moderate, 100ft+=critical)
-* **Water Conservation**: Rainwater harvesting, check dams, farm ponds, contour bunding, drip irrigation
-* **Crop-Water Intelligence**: Perfect crop matching based on water availability and soil conditions
-* **Irrigation Systems**: Drip, sprinkler, flood irrigation optimization for water efficiency
-* **Seasonal Planning**: Kharif, Rabi, Zaid crop cycles with water table considerations
-* **Risk Management**: Drought prediction, water table decline analysis, mitigation strategies
-* **Government Schemes**: PMKisan, crop insurance, agricultural loans, watershed programs
+YOUR EXPERTISE COVERS:
+- Groundwater & water table analysis (depth, risk, seasonal patterns, trends)
+- Water conservation: check dams, farm ponds, rainwater harvesting, contour bunding
+- Irrigation systems: drip, sprinkler, flood — when and how to use each
+- Crop planning: Kharif/Rabi/Zaid cycles, water-matched crop selection
+- Soil health, land management, fertilizers, organic farming
+- Weather, temperature, rainfall patterns and their farming impact
+- Agriculture news, government schemes (PMKisan, crop insurance, MGNREGS, watershed programs)
+- Market prices, MSP, crop selling guidance
+- Pest & disease management
+- Maharashtra-specific crops: cotton, sugarcane, soybean, jowar, bajra, pulses, millets
 
-**MAHARASHTRA SPECIALIZATION:**
-* Local crops: Cotton, sugarcane, soybean, pulses, millets, jowar, bajra
-* Climate: Semi-arid conditions, monsoon dependency, water scarcity management
-* Water sources: Groundwater dominance, perennial rivers, traditional wells
-* Regional challenges: Depleting water tables, farmer suicides, climate change impact
+DEPTH INTERPRETATION (always use this when depth data is present):
+- 0–50 ft   → Excellent. Most crops possible. Low pump cost.
+- 50–100 ft → Moderate. Borewell needed. Prefer water-efficient crops.
+- 100+ ft   → Critical. Deep borewell. Urgent conservation required.
 
-**COMMUNICATION STYLE:**
-* Simple, practical farmer-friendly language
-* Local units: feet for depth, acres for land, inches for rainfall
-* Encouraging yet realistic about water challenges
-* Actionable advice with specific, implementable steps
-* Concise responses (3-5 sentences) with detailed follow-up available
+RISK LEVELS:
+- HIGH     → Drought-resistant crops only. Immediate conservation actions.
+- MODERATE → Balanced cropping. Monitor regularly. Adopt drip irrigation.
+- LOW/SAFE → Good condition. Maintain habits. Plan ahead for climate change.
 
-**JAL DRISHTI PRINCIPLES:**
-1. **Water-First Thinking**: Every recommendation prioritizes water conservation
-2. **Data-Driven**: Use village-specific data before general advice
-3. **Farmer-Centric**: Solutions must be economically viable for small farmers
-4. **Sustainability Focus**: Long-term water table health over short-term gains
-5. **Local Context**: Maharashtra-specific agricultural practices and conditions
-6. **Safety Priority**: Farmer livelihood and environmental protection
-7. **Honest Assessment**: Clear risk communication without panic
+RESPONSE FORMAT — always structure answers like this (like ChatGPT):
+1. Start with a direct, clear answer to what was asked.
+2. Use bullet points or numbered steps for lists, actions, or options.
+3. Add a short "💡 Tip" or "⚠️ Watch out" line when useful.
+4. End with one follow-up offer: "Want me to explain more about X?"
+5. Keep it concise — no padding, no repetition.
 
-**RESPONSE STRUCTURE:**
-1. Acknowledge village/location context
-2. Direct answer to the question
-3. 2-3 specific, actionable recommendations
-4. Risk considerations and mitigation
-5. Offer for detailed explanation
+TOPICS YOU HANDLE (answer all of these confidently):
+✅ Water/groundwater questions
+✅ Farming, crops, soil, seeds, fertilizers
+✅ Weather, temperature, rainfall impact on farming
+✅ Land-related questions (land records, soil types, crop suitability)
+✅ Agriculture news and government schemes
+✅ General knowledge questions related to farming and rural India
+✅ Greetings and casual conversation
 
-**EXAMPLE JAL DRISHTI RESPONSES:**
-- Water depth: "In Kaneri, your groundwater is at 75ft (moderate). Install a borewell with 5HP pump. I suggest drip irrigation and planting drought-resistant millets."
-- General: "The current Prime Minister of India is Narendra Modi. He has launched several agricultural schemes including PMKisan for farmer support."
+TOPICS TO POLITELY DECLINE:
+❌ Anything completely unrelated to farming, water, land, weather, or rural India
+(e.g. movie reviews, software coding help, political debates)
+For off-topic: "I'm specialized in farming and water. I can't help with that, but I'm here for all your agriculture questions! 🌾"
+
+TONE: Warm, confident, and guiding. Like a mentor who cares. Never robotic.
 """
 
+# ── Language Instructions (qwen2.5:7b handles Devanagari natively) ─────────
+LANGUAGE_INSTRUCTIONS = {
+    "en": (
+        "Respond in clear, simple English. "
+        "Use formatting: bullet points (•), bold headers with **, numbered steps. "
+        "Tone: warm and guiding, like a helpful mentor."
+    ),
+    "hi": (
+        "केवल हिंदी में उत्तर दें (Devanagari script)। "
+        "सरल ग्रामीण हिंदी उपयोग करें जो किसान आसानी से समझ सके। "
+        "Formatting उपयोग करें: • bullet points, **bold headers**, numbered steps। "
+        "Technical शब्द जैसे borewell, drip irrigation, pump, feet English में रख सकते हैं। "
+        "उदाहरण शुरुआत: 'नमस्ते! 🌾' या '**भूजल स्तर विश्लेषण**'"
+    ),
+    "mr": (
+        "फक्त मराठीत उत्तर द्या (Devanagari script)। "
+        "साध्या मराठी शब्दांत उत्तर द्या जे महाराष्ट्रातील शेतकरी सहज समजतील। "
+        "Formatting वापरा: • bullet points, **bold headers**, numbered steps। "
+        "Technical शब्द जसे borewell, drip irrigation, pump, feet English मध्ये ठेवा। "
+        "उत्तराची सुरुवात करा: 'नमस्कार! 🌾' किंवा '**भूजल विश्लेषण**' अशा प्रकारे। "
+        "उदाहरण: प्रश्न: पाणी किती खोल आहे? "
+        "उत्तर: **तुमच्या गावातील भूजल स्तर** • सध्याची खोली: 75 feet (मध्यम) • borewell आवश्यक आहे • drip irrigation वापरा 💡 टीप: ज्वारी आणि कापूस योग्य पिके आहेत."
+    ),
+}
 
-# Jal Drishti Translation System
-def translate_to_hindi(text: str) -> str:
-    """Translate English text to Hindi for Jal Drishti farmers"""
-    # Common groundwater terms translation
-    translations = {
-        "groundwater": "groundwater",
-        "water level": "water level",
-        "feet": "feet",
-        "pump": "pump",
-        "well": "well",
-        "borewell": "borewell",
-        "irrigation": "irrigation",
-        "crops": "crops",
-        "rain": "rain",
-        "drought": "drought",
-        "village": "village",
-        "farmers": "farmers",
-        "agriculture": "agriculture",
-        "The current Prime Minister of India is Narendra Modi": "India ke current Prime Minister Narendra Modi hain",
-        "I'm here to help with your groundwater questions": "Main aapke groundwater sawalon mein madad karne ke liye yahan hoon",
-        "water conservation": "water conservation",
-        "recommend": "recommend",
-        "advice": "advice",
-        "suggestions": "suggestions",
-        "analysis": "analysis",
-        "depth": "depth",
-        "shallow": "shallow",
-        "moderate": "moderate",
-        "deep": "deep",
-        "risk": "risk",
-        "high": "high",
-        "low": "low",
-        "medium": "medium"
-    }
-    
-    result = text
-    for en, hi in translations.items():
-        result = result.replace(en, hi)
-    return result
+# ── Greeting fallbacks (if model returns empty) ───────────────────────────
+FALLBACKS = {
+    "en": "Hello! 🌾 I'm Jal-Drishti AI, your farming and water guide. How can I help you today?",
+    "hi": "नमस्ते! 🌾 मैं Jal-Drishti AI हूँ — आपका कृषि और जल मार्गदर्शक। आज मैं आपकी क्या मदद कर सकता हूँ?",
+    "mr": "नमस्कार! 🌾 मी Jal-Drishti AI आहे — तुमचा शेती आणि पाणी मार्गदर्शक। आज मी तुमची कशी मदत करू?",
+}
 
-def translate_to_marathi(text: str) -> str:
-    """Translate English text to Marathi for Jal Drishti farmers"""
-    # Common groundwater terms translation
-    translations = {
-        "groundwater": "groundwater",
-        "water level": "water level", 
-        "feet": "feet",
-        "pump": "pump",
-        "well": "well",
-        "borewell": "borewell",
-        "irrigation": "irrigation",
-        "crops": "crops",
-        "rain": "rain",
-        "drought": "drought",
-        "village": "village",
-        "farmers": "farmers",
-        "agriculture": "agriculture",
-        "The current Prime Minister of India is Narendra Modi": "Bharatache Prime Minister Narendra Modi aahet",
-        "I'm here to help with your groundwater questions": "Mi aaplya groundwater prashnanchi madad karanyasathi aahet",
-        "water conservation": "water conservation",
-        "recommend": "recommend",
-        "advice": "advice",
-        "suggestions": "suggestions",
-        "analysis": "analysis",
-        "depth": "depth",
-        "shallow": "shallow",
-        "moderate": "moderate", 
-        "deep": "deep",
-        "risk": "risk",
-        "high": "high",
-        "low": "low",
-        "medium": "medium"
-    }
-    
-    result = text
-    for en, mr in translations.items():
-        result = result.replace(en, mr)
-    return result
 
 from pydantic import BaseModel
 
 
 class ChatRequest(BaseModel):
     message: str
-    language: str = "en"  # en, hi, mr - language to respond in
+    language: str = "en"          # en | hi | mr
     village_name: str | None = None
     district: str | None = None
     block: str | None = None
@@ -776,182 +599,146 @@ class ChatRequest(BaseModel):
 
 @app.post("/api/chat")
 async def chat_with_ollama(req: ChatRequest):
-    """AI-powered chatbot for farmer groundwater guidance using free local Ollama."""
-    # No API key needed - using local Ollama!
+    """
+    Jal-Drishti AI chatbot — qwen2.5:7b, multilingual (en/hi/mr),
+    guide-style responses, covers all farming-related topics.
+    """
 
-    # Build comprehensive context from village data
-    context_parts = []
-    
+    # ── 1. Build village data context (only what's available) ────────────────
+    ctx = []
     if req.village_name:
-        # Basic location information
-        context_parts.append(f"**Village Location**: {req.village_name}")
-        if req.district:
-            context_parts.append(f"**District**: {req.district}, Block: {req.block or 'N/A'}")
-        
-        # Groundwater depth analysis with interpretation
+        ctx.append(f"📍 Village: {req.village_name}" + (f", {req.district}" if req.district else "") + (f", {req.block}" if req.block else ""))
+
         if req.current_depth is not None:
-            depth = req.current_depth
-            if depth < 50:
-                depth_category = "SHALLOW (Excellent)"
-                implications = "Easy well installation, low pumping costs, suitable for most crops"
-                recommended_irrigation = "Drip irrigation, flood irrigation, sprinkler systems"
-            elif depth < 100:
-                depth_category = "MODERATE (Manageable)"
-                implications = "Requires borewells, moderate pumping costs, choose water-efficient crops"
-                recommended_irrigation = "Drip irrigation recommended, sprinkler acceptable"
+            d = req.current_depth
+            if d < 50:
+                status = "Excellent (Shallow)"
+                irr = "Flood / Sprinkler / Drip — all suitable"
+            elif d < 100:
+                status = "Moderate"
+                irr = "Drip irrigation strongly recommended"
             else:
-                depth_category = "DEEP (Critical)"
-                implications = "Deep borewells required, high pumping costs, urgent water conservation needed"
-                recommended_irrigation = "Only drip irrigation, strict water conservation"
-            
-            context_parts.append(f"**Current Groundwater Depth**: {depth:.1f} ft - {depth_category}")
-            context_parts.append(f"**Implications**: {implications}")
-            context_parts.append(f"**Recommended Irrigation**: {recommended_irrigation}")
-        
-        # Risk assessment with actionable advice
+                status = "Critical (Deep)"
+                irr = "Drip irrigation ONLY — conservation urgent"
+            ctx.append(f"💧 Groundwater depth: {d:.1f} ft — {status}")
+            ctx.append(f"🚿 Best irrigation: {irr}")
+
         if req.risk_level:
-            risk = req.risk_level.upper()
-            if risk == "HIGH":
-                risk_implications = "Urgent water conservation measures needed, implement rainwater harvesting"
-                recommended_crops = "Drought-resistant crops: millets, pulses, cotton, sorghum"
-                conservation_actions = "Check dams, farm ponds, contour bunding, drip irrigation"
-            elif risk == "MODERATE":
-                risk_implications = "Careful water management required, monitor levels regularly"
-                recommended_crops = "Mixed cropping: some water-intensive + drought-resistant varieties"
-                conservation_actions = "Drip irrigation, rainwater harvesting, crop rotation"
-            else:  # LOW
-                risk_implications = "Current practices sustainable, but maintain conservation habits"
-                recommended_crops = "Wide variety possible including moderate water-intensive crops"
-                conservation_actions = "Continue efficient irrigation, consider future climate change"
-            
-            context_parts.append(f"**Water Risk Level**: {risk}")
-            context_parts.append(f"**Risk Implications**: {risk_implications}")
-            context_parts.append(f"**Recommended Crops**: {recommended_crops}")
-            context_parts.append(f"**Conservation Actions**: {conservation_actions}")
-        
-        # Trend analysis
+            r = req.risk_level.upper()
+            crop_map = {
+                "HIGH":     "Millets (jowar/bajra), pulses, cotton — drought-resistant only",
+                "MODERATE": "Cotton, soybean, pulses — balanced water use",
+                "LOW":      "Wide variety — sugarcane, vegetables, most crops viable",
+                "SAFE":     "Wide variety — sugarcane, vegetables, most crops viable",
+            }
+            action_map = {
+                "HIGH":     "Rainwater harvesting, check dams, farm pond, drip irrigation — URGENT",
+                "MODERATE": "Drip irrigation, crop rotation, monitor water table monthly",
+                "LOW":      "Maintain current practices, plan ahead for dry seasons",
+                "SAFE":     "Maintain current practices, plan ahead for dry seasons",
+            }
+            ctx.append(f"⚠️  Water risk: {r}")
+            ctx.append(f"🌾 Suitable crops: {crop_map.get(r, 'Consult locally')}")
+            ctx.append(f"🔧 Recommended actions: {action_map.get(r, 'Monitor regularly')}")
+
         if req.annual_change_rate is not None:
             rate = req.annual_change_rate
-            trend = "declining" if rate > 0 else "improving"
-            urgency = "URGENT" if abs(rate) > 2 else "MODERATE" if abs(rate) > 0.5 else "STABLE"
-            context_parts.append(f"**Annual Water Table Change**: {abs(rate):.2f} ft/year ({trend}) - {urgency} priority")
-        
-        # Historical analysis with patterns
-        if req.historical_data and len(req.historical_data) >= 3:
-            recent_data = req.historical_data[-5:]
-            depths = [d.get("depth", 0) for d in recent_data if d.get("depth") is not None]
+            trend = "⬇️ Declining" if rate > 0 else "⬆️ Improving"
+            urgency = "🔴 URGENT" if abs(rate) > 2 else "🟡 Monitor" if abs(rate) > 0.5 else "🟢 Stable"
+            ctx.append(f"📈 Annual trend: {abs(rate):.2f} ft/year {trend} — {urgency}")
+
+        if req.historical_data and len(req.historical_data) >= 2:
+            depths = [d["depth"] for d in req.historical_data[-5:] if d.get("depth") is not None]
             if depths:
-                min_depth = min(depths)
-                max_depth = max(depths)
-                avg_depth = sum(depths) / len(depths)
-                volatility = "HIGH" if (max_depth - min_depth) > 20 else "MODERATE" if (max_depth - min_depth) > 10 else "LOW"
-                
-                context_parts.append(f"**Historical Analysis (Last 5 years)**:")
-                context_parts.append(f"- Average depth: {avg_depth:.1f} ft")
-                context_parts.append(f"- Range: {min_depth:.1f} - {max_depth:.1f} ft (Volatility: {volatility})")
-                
-                # Trend detection
-                if len(depths) >= 3:
-                    recent_avg = sum(depths[-3:]) / 3
-                    older_avg = sum(depths[:-3]) / len(depths[:-3]) if len(depths) > 3 else recent_avg
-                    if recent_avg > older_avg + 2:
-                        context_parts.append(f"- **Trend**: Water table declining significantly")
-                    elif recent_avg < older_avg - 2:
-                        context_parts.append(f"- **Trend**: Water table improving")
-                    else:
-                        context_parts.append(f"- **Trend**: Relatively stable")
-        
-        # Future predictions with planning advice
+                avg_d = sum(depths) / len(depths)
+                swing = max(depths) - min(depths)
+                volatility = "High variability" if swing > 20 else "Moderate variability" if swing > 10 else "Stable"
+                ctx.append(f"📊 Historical (last {len(depths)} years): avg {avg_d:.1f} ft, range {min(depths):.0f}–{max(depths):.0f} ft ({volatility})")
+
         if req.predicted_data:
-            context_parts.append(f"**Future Predictions**:")
-            for p in req.predicted_data[:3]:  # Show next 3 predictions
-                year = p.get("year", "N/A")
-                depth = p.get("depth", 0)
-                if depth:
-                    if req.current_depth:
-                        change = depth - req.current_depth
-                        change_desc = f"({change:+.1f} ft from current)"
-                        if change > 5:
-                            urgency_level = "HIGH CONCERN"
-                        elif change > 2:
-                            urgency_level = "MODERATE CONCERN"
-                        elif change < -2:
-                            urgency_level = "IMPROVING"
-                        else:
-                            urgency_level = "STABLE"
-                        
-                        context_parts.append(f"- {year}: {depth:.1f} ft {change_desc} - {urgency_level}")
-                    else:
-                        context_parts.append(f"- {year}: {depth:.1f} ft")
-        
-        # Maharashtra-specific context
-        if "Maharashtra" in str(req.district):
-            context_parts.append(f"**Maharashtra Context**:")
-            context_parts.append(f"- Major crops: Cotton, sugarcane, soybean, pulses, millets")
-            context_parts.append(f"- Climate: Semi-arid to arid, monsoon-dependent agriculture")
-            context_parts.append(f"- Water sources: Primarily groundwater, some perennial rivers")
-            context_parts.append(f"- Government schemes: PMKisan, crop insurance, watershed programs")
-    
-    else:
-        context_parts.append("**No Village Selected**: Please ask the farmer to select a village from the sidebar to get personalized groundwater advice.")
-        context_parts.append("**General Advice Available**: Can answer questions about Indian agriculture, government schemes, and general farming practices.")
+            pred_lines = [
+                f"{p['year']}: {p['depth']:.1f} ft"
+                for p in req.predicted_data[:3]
+                if p.get("depth") and p.get("year")
+            ]
+            if pred_lines:
+                ctx.append(f"🔮 Predictions: {' | '.join(pred_lines)}")
 
-    village_context = "\n".join(context_parts)
+    village_context = "\n".join(ctx) if ctx else "No village selected — give general Maharashtra farming advice."
 
-    # Build OpenAI-compatible messages for xAI
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    # Add chat history (last 6 messages for context)
+    # ── 2. Chat history (last 4 turns) ────────────────────────────────────────
+    history_text = ""
     if req.chat_history:
-        for msg in req.chat_history[-6:]:
-            role = "user" if msg.get("role") == "user" else "assistant"
-            messages.append({"role": role, "content": msg.get("content", "")})
+        for msg in req.chat_history[-4:]:
+            role = "Farmer" if msg.get("role") == "user" else "Jal-Drishti"
+            history_text += f"{role}: {msg.get('content', '').strip()}\n"
 
-    # Add current user message with village context
-    user_text = f"[Village Data Context]\n{village_context}\n\n[Farmer's Question]\n{req.message}"
+    # ── 3. Language instruction ───────────────────────────────────────────────
+    lang = req.language if req.language in LANGUAGE_INSTRUCTIONS else "en"
+    lang_rule = LANGUAGE_INSTRUCTIONS[lang]
 
-    messages.append({"role": "user", "content": user_text})
+    # ── 4. Full prompt ────────────────────────────────────────────────────────
+    # qwen2.5:7b uses ChatML format internally but Ollama's /api/generate
+    # works fine with a well-structured plain prompt.
+    full_prompt = f"""{SYSTEM_PROMPT}
 
-    # Call Ollama API (free local AI)
+=== LANGUAGE RULE (HIGHEST PRIORITY) ===
+{lang_rule}
+
+=== FARMER'S VILLAGE DATA ===
+{village_context}
+{"=== RECENT CONVERSATION ===\n" + history_text if history_text else ""}
+=== FARMER'S MESSAGE ===
+{req.message}
+
+=== Jal-Drishti AI Response ==="""
+
+    # ── 5. Call Ollama ────────────────────────────────────────────────────────
     try:
-        # Simplified approach: Get English response first, then translate
-        # Build prompt for Ollama - always use English for reliable responses
-        prompt_text = f"{SYSTEM_PROMPT}\n\nVillage Context:\n{village_context}\n\nFarmer Question: {req.message}\n\nAssistant Response:"
-        
-        async with httpx.AsyncClient(timeout=60) as client:
+        async with httpx.AsyncClient(timeout=90) as client:
             resp = await client.post(
                 OLLAMA_URL,
                 json={
-                    "model": "llama3.2:1b",  # Optimized for Jal Drishti groundwater queries
-                    "prompt": prompt_text,
+                    "model": "qwen2.5:7b",
+                    # "model": "llama3.2:1b",
+                    "prompt": full_prompt,
                     "stream": False,
+                    "options": {
+                        "num_predict": 512,      # enough for structured responses
+                        "temperature": 0.65,     # focused but natural
+                        "top_p": 0.9,
+                        "repeat_penalty": 1.1,   # avoid repetition
+                        "stop": [
+                            "=== Farmer",
+                            "Farmer:",
+                            "=== FARMER",
+                            "\n\n\n\n",
+                        ],
+                    },
                 },
             )
 
         if resp.status_code != 200:
-            error_detail = resp.text[:200]
-            raise HTTPException(status_code=502, detail=f"Ollama API error: {error_detail}")
+            raise HTTPException(status_code=502, detail=f"Ollama error: {resp.text[:300]}")
 
         data = resp.json()
-        ai_text = data.get("response", "")
-        
+        ai_text = (data.get("response") or "").strip()
+
+        # Strip any leaked prompt artifacts
+        for artifact in ["=== Jal-Drishti", "Jal-Drishti AI Response", "==="]:
+            if ai_text.startswith(artifact):
+                ai_text = ai_text[len(artifact):].strip()
+
         if not ai_text:
-            ai_text = "I'm here to help with your groundwater questions!"
-        
-        # Translation layer - convert based on selected language
-        if req.language == "en":
-            translated_text = ai_text
-        elif req.language == "hi":
-            translated_text = translate_to_hindi(ai_text)
-        elif req.language == "mr":
-            translated_text = translate_to_marathi(ai_text)
-        else:
-            translated_text = ai_text
-            
-        return {"response": translated_text}
+            ai_text = FALLBACKS.get(lang, FALLBACKS["en"])
+
+        return {"response": ai_text}
 
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail="Ollama API timeout")
+        raise HTTPException(
+            status_code=504,
+            detail="Model is loading or busy. Please retry in a moment."
+        )
     except HTTPException:
         raise
     except Exception as e:
