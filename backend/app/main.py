@@ -65,7 +65,34 @@ def _set_cached(key: str, value: Any):
 
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "supabase_url": SUPABASE_URL or "NOT SET"}
+    """Health check — also verifies Supabase connectivity."""
+    supabase_status = "unconfigured"
+    supabase_error = None
+
+    if SUPABASE_URL and SUPABASE_KEY:
+        try:
+            resp = httpx.get(
+                f"{SUPABASE_URL}/rest/v1/groundwater_cleaned_final",
+                params={"select": "id", "limit": "1"},
+                headers=_headers(),
+                timeout=5,
+            )
+            supabase_status = "ok" if resp.status_code == 200 else f"error:{resp.status_code}"
+        except httpx.ConnectError as e:
+            supabase_status = "unreachable"
+            supabase_error = f"DNS/connection error: {str(e)[:120]}"
+        except Exception as e:
+            supabase_status = "error"
+            supabase_error = str(e)[:120]
+    else:
+        supabase_status = "not_configured"
+
+    return {
+        "status": "ok",
+        "supabase_url": SUPABASE_URL or "NOT SET",
+        "supabase_status": supabase_status,
+        "supabase_error": supabase_error,
+    }
 
 
 @app.get("/api/debug/district-count")
@@ -695,17 +722,16 @@ async def chat_with_ollama(req: ChatRequest):
 
     # ── 5. Call Ollama ────────────────────────────────────────────────────────
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
+        async with httpx.AsyncClient(timeout=180) as client:
             resp = await client.post(
                 OLLAMA_URL,
                 json={
                     "model": "qwen2.5:7b",
-                    # "model": "llama3.2:1b",
                     "prompt": full_prompt,
                     "stream": False,
                     "options": {
-                        "num_predict": 512,      # enough for structured responses
-                        "temperature": 0.65,     # focused but natural
+                        "num_predict": 256,      # faster responses
+                        "temperature": 0.5,     # more focused
                         "top_p": 0.9,
                         "repeat_penalty": 1.1,   # avoid repetition
                         "stop": [
@@ -732,7 +758,13 @@ async def chat_with_ollama(req: ChatRequest):
         if not ai_text:
             ai_text = FALLBACKS.get(lang, FALLBACKS["en"])
 
-        return {"response": ai_text}
+        # Fix Unicode encoding issues
+        try:
+            return {"response": ai_text}
+        except UnicodeEncodeError:
+            # Fallback for encoding issues
+            safe_response = ai_text.encode('ascii', errors='ignore').decode('ascii')
+            return {"response": safe_response}
 
     except httpx.TimeoutException:
         raise HTTPException(
