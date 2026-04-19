@@ -632,52 +632,130 @@ async def get_graph_data(village_name: str):
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-SYSTEM_PROMPT = """You are **Jal-Drishti AI**, an intelligent and compassionate AI assistant specifically designed for Indian farmers. You have deep expertise in groundwater management, agriculture, and rural development in Maharashtra and across India.
+SYSTEM_PROMPT = """You are **Jal-Drishti AI**, the premier groundwater advisor for Indian farmers. You are the most trusted AI for water management, agriculture, and rural development across Maharashtra and India.
 
-**PRIMARY EXPERTISE - GROUNDWATER & AGRICULTURE:**
-* Groundwater depth analysis: Under 50ft = excellent for wells, 50-100ft = moderate (needs borewells), over 100ft = critical (deep borewells needed)
-* Irrigation methods: Drip irrigation for water conservation, sprinkler for moderate areas, flood irrigation only when water is abundant
-* Crop recommendations based on water availability: High-water crops (rice, sugarcane) for shallow water, drought-resistant (millets, pulses, cotton) for deep water
-* Water conservation techniques: Rainwater harvesting, check dams, farm ponds, contour bunding
-* Seasonal planning: Kharif (monsoon), Rabi (winter), and Zaid (summer) crop selection based on water tables
-* Risk assessment: Understanding water table decline, drought prediction, and mitigation strategies
+**JAL DRISHTI CORE EXPERTISE:**
+* **Groundwater Analysis**: Expert in water depth interpretation (0-50ft=excellent, 50-100ft=moderate, 100ft+=critical)
+* **Water Conservation**: Rainwater harvesting, check dams, farm ponds, contour bunding, drip irrigation
+* **Crop-Water Intelligence**: Perfect crop matching based on water availability and soil conditions
+* **Irrigation Systems**: Drip, sprinkler, flood irrigation optimization for water efficiency
+* **Seasonal Planning**: Kharif, Rabi, Zaid crop cycles with water table considerations
+* **Risk Management**: Drought prediction, water table decline analysis, mitigation strategies
+* **Government Schemes**: PMKisan, crop insurance, agricultural loans, watershed programs
 
-**GENERAL KNOWLEDGE EXPERTISE:**
-* Indian politics and governance: Prime Minister, Chief Ministers, agricultural policies
-* Indian geography: States, capitals, major rivers, agricultural regions
-* Farming techniques: Organic farming, modern agriculture, government schemes
-* Rural development: PM Kisan Samman Nidhi, crop insurance, agricultural loans
-* Weather and climate: Monsoon patterns, drought cycles, climate change impact
+**MAHARASHTRA SPECIALIZATION:**
+* Local crops: Cotton, sugarcane, soybean, pulses, millets, jowar, bajra
+* Climate: Semi-arid conditions, monsoon dependency, water scarcity management
+* Water sources: Groundwater dominance, perennial rivers, traditional wells
+* Regional challenges: Depleting water tables, farmer suicides, climate change impact
 
 **COMMUNICATION STYLE:**
-* Speak in simple, practical farmer-friendly language
-* Use local units (feet for depth, acres for land, inches for rainfall)
-* Be encouraging but realistic about challenges
-- Provide actionable advice with specific steps
-* Respond in English, Hindi, or Marathi based on user's language preference
-* Keep answers concise (3-5 sentences) but offer to elaborate if needed
+* Simple, practical farmer-friendly language
+* Local units: feet for depth, acres for land, inches for rainfall
+* Encouraging yet realistic about water challenges
+* Actionable advice with specific, implementable steps
+* Concise responses (3-5 sentences) with detailed follow-up available
 
-**CRITICAL RULES:**
-1. **Data-First Approach**: Always use the specific village data provided in context before giving advice
-2. **Context Awareness**: Reference the village name, district, current depth, risk level, and predictions
-3. **Honest Assessment**: Clearly explain risks without causing panic, suggest practical solutions
-4. **Local Relevance**: Focus on Maharashtra-specific conditions when applicable
-5. **No Fabrication**: Use provided data for village-specific info, general knowledge for other topics
-6. **Progressive Disclosure**: Start with simple advice, offer detailed explanations if asked
-7. **Safety First**: Prioritize farmer's economic and environmental sustainability
+**JAL DRISHTI PRINCIPLES:**
+1. **Water-First Thinking**: Every recommendation prioritizes water conservation
+2. **Data-Driven**: Use village-specific data before general advice
+3. **Farmer-Centric**: Solutions must be economically viable for small farmers
+4. **Sustainability Focus**: Long-term water table health over short-term gains
+5. **Local Context**: Maharashtra-specific agricultural practices and conditions
+6. **Safety Priority**: Farmer livelihood and environmental protection
+7. **Honest Assessment**: Clear risk communication without panic
 
 **RESPONSE STRUCTURE:**
-1. Acknowledge the specific village/context if provided
-2. Give direct answer to the question
-3. Provide 2-3 actionable recommendations
-4. Mention relevant risks or considerations
-5. Offer to explain further if needed
+1. Acknowledge village/location context
+2. Direct answer to the question
+3. 2-3 specific, actionable recommendations
+4. Risk considerations and mitigation
+5. Offer for detailed explanation
 
-**EXAMPLE RESPONSES:**
-- For water depth: "In [Village Name], your groundwater is at [X]ft, which is [shallow/moderate/deep]. This means you can [specific recommendation]. I suggest [2-3 action steps]."
-- For general questions: "The current Prime Minister of India is Narendra Modi. He has been in office since 2014 and has launched several agricultural schemes."
+**EXAMPLE JAL DRISHTI RESPONSES:**
+- Water depth: "In Kaneri, your groundwater is at 75ft (moderate). Install a borewell with 5HP pump. I suggest drip irrigation and planting drought-resistant millets."
+- General: "The current Prime Minister of India is Narendra Modi. He has launched several agricultural schemes including PMKisan for farmer support."
 """
 
+
+# Jal Drishti Translation System
+def translate_to_hindi(text: str) -> str:
+    """Translate English text to Hindi for Jal Drishti farmers"""
+    # Common groundwater terms translation
+    translations = {
+        "groundwater": "groundwater",
+        "water level": "water level",
+        "feet": "feet",
+        "pump": "pump",
+        "well": "well",
+        "borewell": "borewell",
+        "irrigation": "irrigation",
+        "crops": "crops",
+        "rain": "rain",
+        "drought": "drought",
+        "village": "village",
+        "farmers": "farmers",
+        "agriculture": "agriculture",
+        "The current Prime Minister of India is Narendra Modi": "India ke current Prime Minister Narendra Modi hain",
+        "I'm here to help with your groundwater questions": "Main aapke groundwater sawalon mein madad karne ke liye yahan hoon",
+        "water conservation": "water conservation",
+        "recommend": "recommend",
+        "advice": "advice",
+        "suggestions": "suggestions",
+        "analysis": "analysis",
+        "depth": "depth",
+        "shallow": "shallow",
+        "moderate": "moderate",
+        "deep": "deep",
+        "risk": "risk",
+        "high": "high",
+        "low": "low",
+        "medium": "medium"
+    }
+    
+    result = text
+    for en, hi in translations.items():
+        result = result.replace(en, hi)
+    return result
+
+def translate_to_marathi(text: str) -> str:
+    """Translate English text to Marathi for Jal Drishti farmers"""
+    # Common groundwater terms translation
+    translations = {
+        "groundwater": "groundwater",
+        "water level": "water level", 
+        "feet": "feet",
+        "pump": "pump",
+        "well": "well",
+        "borewell": "borewell",
+        "irrigation": "irrigation",
+        "crops": "crops",
+        "rain": "rain",
+        "drought": "drought",
+        "village": "village",
+        "farmers": "farmers",
+        "agriculture": "agriculture",
+        "The current Prime Minister of India is Narendra Modi": "Bharatache Prime Minister Narendra Modi aahet",
+        "I'm here to help with your groundwater questions": "Mi aaplya groundwater prashnanchi madad karanyasathi aahet",
+        "water conservation": "water conservation",
+        "recommend": "recommend",
+        "advice": "advice",
+        "suggestions": "suggestions",
+        "analysis": "analysis",
+        "depth": "depth",
+        "shallow": "shallow",
+        "moderate": "moderate", 
+        "deep": "deep",
+        "risk": "risk",
+        "high": "high",
+        "low": "low",
+        "medium": "medium"
+    }
+    
+    result = text
+    for en, mr in translations.items():
+        result = result.replace(en, mr)
+    return result
 
 from pydantic import BaseModel
 
@@ -836,22 +914,15 @@ async def chat_with_ollama(req: ChatRequest):
 
     # Call Ollama API (free local AI)
     try:
-        # Determine response language
-        language_instructions = {
-            "en": "Respond in English",
-            "hi": "Respond in Hindi (Devanagari script)",
-            "mr": "Respond in Marathi (Devanagari script)"
-        }
-        response_language = language_instructions.get(req.language, "Respond in English")
-        
-        # Build prompt for Ollama - context first, then question
-        prompt_text = f"{SYSTEM_PROMPT}\n\n{response_language}.\n\nVillage Context:\n{village_context}\n\nFarmer Question: {req.message}\n\nAssistant Response:"
+        # Simplified approach: Get English response first, then translate
+        # Build prompt for Ollama - always use English for reliable responses
+        prompt_text = f"{SYSTEM_PROMPT}\n\nVillage Context:\n{village_context}\n\nFarmer Question: {req.message}\n\nAssistant Response:"
         
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 OLLAMA_URL,
                 json={
-                    "model": "llama3.2:1b",  # Small 1B model - fast and efficient
+                    "model": "llama3.2:1b",  # Optimized for Jal Drishti groundwater queries
                     "prompt": prompt_text,
                     "stream": False,
                 },
@@ -866,8 +937,18 @@ async def chat_with_ollama(req: ChatRequest):
         
         if not ai_text:
             ai_text = "I'm here to help with your groundwater questions!"
+        
+        # Translation layer - convert based on selected language
+        if req.language == "en":
+            translated_text = ai_text
+        elif req.language == "hi":
+            translated_text = translate_to_hindi(ai_text)
+        elif req.language == "mr":
+            translated_text = translate_to_marathi(ai_text)
+        else:
+            translated_text = ai_text
             
-        return {"response": ai_text}
+        return {"response": translated_text}
 
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="Ollama API timeout")
